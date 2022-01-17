@@ -179,7 +179,7 @@ func extractArtifacts(job Job) {
 		println("Download", artifactsPath)
 		url := os.Getenv("CI_API_V4_URL") +
 			"/projects/" + os.Getenv("CI_PROJECT_ID") +
-			"/jobs/" + string(job.Id) +
+			"/jobs/" + strconv.Itoa(job.Id) +
 			"/artifacts?job_token=" + os.Getenv("CI_JOB_TOKEN")
 		downloadFile(artifactsPath, url)
 		println("unzip", artifactsPath)
