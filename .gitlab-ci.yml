@@ -1,6 +1,6 @@
 
 variables:
-  GIT_DEPTH: 10000
+  GIT_DEPTH: 1000
 
 SERVICE-A-node:
   image: jersou/alpine-bash-curl-fx-git-nodejs-unzip

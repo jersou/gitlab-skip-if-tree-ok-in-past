@@ -84,9 +84,9 @@ func green(msg string) {
 	fmt.Println("\033[1;42;30m", " ", msg, " ", "\033[0m")
 }
 
-func exitIfError(err error) {
+func exitIfError(err error, msg string) {
 	if err != nil {
-		fmt.Printf("\x1b[31;1m%s\x1b[0m\n", fmt.Sprintf("error: %s", err))
+		red("exitIfError : " + msg)
 		red(fmt.Sprintf("error: %s", err))
 		_ = os.WriteFile(getCiSkipPath(), []byte("false"), 0644)
 		os.Exit(1)
@@ -94,18 +94,22 @@ func exitIfError(err error) {
 }
 
 func getTreeOfPaths(repository *git.Repository, hash plumbing.Hash, paths []string) (string, error) {
+	verbose("getTreeOfPaths: hash=" + hash.String())
 	commit, err := repository.CommitObject(hash)
 	if err != nil {
+		verbose("error: repository.CommitObject(hash) : " + hash.String())
 		return "", err
 	}
 	tree, err := repository.TreeObject(commit.TreeHash)
 	if err != nil {
+		verbose("error: repository.TreeObject(commit.TreeHash) : " + commit.TreeHash.String())
 		return "", err
 	}
 	entries := ""
 	for _, path := range paths {
-		entry, err := tree.FindEntry(string(path))
+		entry, err := tree.FindEntry(strings.TrimSuffix(path, "/"))
 		if err != nil {
+			verbose("error: tree.FindEntry(string(path)) : " + path)
 			return "", err
 		}
 		entries += entry.Hash.String() + " " + string(path) + "\n"
@@ -120,20 +124,20 @@ func getProjectJobs(page int) []Job {
 		"/jobs?scope=success&per_page=100&page=" + strconv.Itoa(page) +
 		"&private_token=" + os.Getenv("API_READ_TOKEN")
 	res, err := http.Get(url)
-	exitIfError(err)
+	exitIfError(err, "getProjectJobs::http.Get")
 	if res.Body != nil {
 		defer res.Body.Close()
 	}
 	var jobs []Job
 	err = json.NewDecoder(res.Body).Decode(&jobs)
-	exitIfError(err)
+	exitIfError(err, "json.NewDecoder(res.Body).Decode(&jobs)")
 	return jobs
 }
 
 func extractArchive(archivePath string, outputPath string) {
 	verbose("Extract archive : " + archivePath)
 	archive, err := zip.OpenReader(archivePath)
-	exitIfError(err)
+	exitIfError(err, "extractArchive::zip.OpenReader")
 	defer archive.Close()
 	for _, f := range archive.File {
 		verbose("Extract archive file : " + f.Name)
@@ -141,34 +145,34 @@ func extractArchive(archivePath string, outputPath string) {
 		fmt.Println("unzipping file ", filePath)
 		if f.FileInfo().IsDir() {
 			err = os.MkdirAll(filePath, os.ModePerm)
-			exitIfError(err)
+			exitIfError(err, "f.FileInfo().IsDir() extractArchive::os.MkdirAll")
 			continue
 		}
 		err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
-		exitIfError(err)
+		exitIfError(err, "extractArchive::os.MkdirAll")
 		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		exitIfError(err)
+		exitIfError(err, "extractArchive::os.OpenFile")
 		fileInArchive, err := f.Open()
-		exitIfError(err)
+		exitIfError(err, "extractArchive::f.Open")
 		_, err = io.Copy(dstFile, fileInArchive)
-		exitIfError(err)
+		exitIfError(err, "extractArchive::io.Copy")
 		err = dstFile.Close()
-		exitIfError(err)
+		exitIfError(err, "extractArchive::dstFile.Close()")
 		err = fileInArchive.Close()
-		exitIfError(err)
+		exitIfError(err, "extractArchive::fileInArchive.Close()")
 	}
 }
 
 func downloadFile(filepath string, url string) {
 	verbose("DownloadFile file : " + url)
 	resp, err := http.Get(url)
-	exitIfError(err)
+	exitIfError(err, "downloadFile::http.Get(url)")
 	defer resp.Body.Close()
 	out, err := os.Create(filepath)
-	exitIfError(err)
+	exitIfError(err, "downloadFile::os.Create(filepath)")
 	defer out.Close()
 	_, err = io.Copy(out, resp.Body)
-	exitIfError(err)
+	exitIfError(err, "downloadFile::io.Copy(out, resp.Body)")
 }
 
 func extractArtifacts(job Job) {
@@ -209,16 +213,18 @@ func initCheck() {
 		printHelp()
 		os.Exit(1)
 	}
+	verbose("SKIP_IF_TREE_OK_IN_PAST=" + os.Getenv("SKIP_IF_TREE_OK_IN_PAST"))
 	if os.Getenv("API_READ_TOKEN") == "" {
 		red("Error : API_READ_TOKEN is empty")
 		printHelp()
 		os.Exit(2)
 	}
 	ciSkipPath := getCiSkipPath()
+	verbose("ciSkipPath=" + ciSkipPath)
 	if _, err := os.Stat(ciSkipPath); err == nil {
 		content, err := os.ReadFile(ciSkipPath)
 		verbose("ci-skip file exists, content=" + string(content))
-		exitIfError(err)
+		exitIfError(err, "initCheck::os.ReadFile(ciSkipPath)")
 		if string(content) == "true" {
 			os.Exit(0)
 		} else {
@@ -232,12 +238,12 @@ func main() {
 	ciJobName := os.Getenv("CI_JOB_NAME")
 	ciCommitRefName := os.Getenv("CI_COMMIT_REF_NAME")
 	repository, err := git.PlainOpen(".")
-	exitIfError(err)
+	exitIfError(err, "main::git.PlainOpen(\".\")")
 	head, err := repository.Head()
-	exitIfError(err)
+	exitIfError(err, "main::repository.Head()")
 	paths := strings.Split(os.Getenv("SKIP_IF_TREE_OK_IN_PAST"), " ")
 	currentTree, err := getTreeOfPaths(repository, head.Hash(), paths)
-	exitIfError(err)
+	exitIfError(err, "main::getTreeOfPaths(repository, head.Hash(), paths)")
 	verbose("------------------------------ Current tree : ----------------------------------\n" +
 		currentTree + "--------------------------------------------------------------------------------")
 
@@ -258,7 +264,7 @@ func main() {
 				if err == nil && currentTree == tree {
 					extractArtifacts(job)
 					err := os.WriteFile(getCiSkipPath(), []byte("true"), 0644)
-					exitIfError(err)
+					exitIfError(err, "main::os.WriteFile")
 					green("✅ tree found in job " + job.Web_url)
 					os.Exit(0)
 				}
