@@ -100,7 +100,7 @@ function fetchJson(url) {
 
 function downloadFile(path, url) {
   return new Promise((resolve, reject) => {
-    verbose(`DownloadFile file : ${url}`);
+    verbose(`DownloadFile file`);
     const file = fs.createWriteStream(path);
     let client = url.match(/^https/) ? https : http;
     client
