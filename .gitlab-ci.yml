@@ -1,0 +1,63 @@
+
+variables:
+  GIT_DEPTH: 10000
+
+SERVICE-A-node:
+  image: jersou/alpine-bash-curl-fx-git-nodejs-unzip
+  stage: test
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-A _example/LIB-1/test.sh _example/LIB-2 .gitlab-ci.yml node-version/skip.js
+  script:
+    - time node-version/skip.js || _example/service-A/test.sh
+    - time node-version/skip.js || _example/service-A/test.sh
+    - time node-version/skip.js || _example/service-A/test.sh
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - result.txt
+
+
+SERVICE-A-go:
+  image: alpine
+  stage: test
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-A _example/LIB-1/test.sh _example/LIB-2 .gitlab-ci.yml go-version/skip-if-tree-ok-in-past
+  script:
+    - time go-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+    - time go-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+    - time go-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - result.txt
+
+
+SERVICE-B-node:
+  image: jersou/alpine-bash-curl-fx-git-nodejs-unzip
+  stage: test
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-B _example/LIB-2 .gitlab-ci.yml node-version/skip.js
+  script:
+    - time node-version/skip.js || _example/service-B/test.sh
+    - time node-version/skip.js || _example/service-B/test.sh
+    - time node-version/skip.js || _example/service-B/test.sh
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - result.txt
+
+
+SERVICE-B-go:
+  image: alpine
+  stage: test
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-B _example/LIB-2 .gitlab-ci.yml go-version/skip-if-tree-ok-in-past
+  script:
+    - time go-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+    - time go-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+    - time go-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - result.txt
+
