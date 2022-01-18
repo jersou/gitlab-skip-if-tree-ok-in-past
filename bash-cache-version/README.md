@@ -1,36 +1,10 @@
-# Add "skip if sub tree is ok in the past" job option, useful in monorepos ~= Idempotent job
 
-* GitLab issue : https://gitlab.com/gitlab-org/gitlab/-/issues/350212
-* working API version : https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past
+See ../.gitlab-ci.yml file exemple, job ".bash-api-version-ci-history", "SERVICE-A-cache" and "SERVICE-B-cache"
 
 
-### Problem to solve
 
-On monorepo projects (especially), the jobs are run all the time, even
-if their state has already been successfully run previously. Time and
-resources could be saved by checking that the version of the files used
-by the job has already succeeded in the past.
 
-### Proposal
-
-An option in `.gtlab-ci.yml` file "idempotent_tree" (name to be determined)
-with an array of paths could be used to make a history of state that have
-passed the job with success:
-
-```
-service-A:
-  idempotent_tree:
-    - service-A/
-    - LIB-1/
-    - LIB-2/
-    - .gitlab-ci.yml
-  script:
-    - service-A/test.sh
-```
-
-A POC of this idea is operational here
-[jersou / Gitlab Tree Ok Cache](https://gitlab.com/jersou/gitlab-tree-ok-cache),
-it uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of the "state" :
+This implementation uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of the "state" :
 
 ```yaml
   # allow the 222 exit code : allow failure if tree is found in history
@@ -77,20 +51,3 @@ If the job is successful, the SHA-1 is added to the `.ci_ok_history` file. This 
       - .ci_ok_history
 ```
 
-This POC work fine, but need git in the docker image, and it would be much more
-graceful if it was integrated in gitlab of course.
-
-### Further details
-
-If this idea is implemented in gitlab, the problem of artifacts should be addressed,
-perhaps a link could be made to the artifact of the job that was found in the history.
-And if the artifacts are outdated, then the current job is finally executed to produce
-a new artifact (possibly activated/deactivated by an option).
-
-Or the job could be skipped like the "only:changes" option.
-
-### Links / references
-
-[jersou / Gitlab Tree Ok Cache · GitLab](https://gitlab.com/jersou/gitlab-tree-ok-cache)
-
-/label ~"feature::addition" ~"type::feature" ~"CI jobs"
