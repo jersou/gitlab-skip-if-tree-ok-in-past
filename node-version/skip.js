@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// From https://gitlab.com/jersou/gitlab-tree-ok-cache/-/blob/skip-version/skip.js
+// From https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past
+//    & https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
 // Implementation summary :
 //     1. Check if the script has already been completed : check /tmp/ci-skip. If file exists, exit, else :
 //     2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
@@ -29,9 +30,9 @@
 //     GIT_DEPTH: 10000
 //     SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
 // script:
-//   - ./skip.js || service-A/test1.sh
-//   - ./skip.js || service-A/test2.sh
-//   - ./skip.js || service-A/test3.sh
+//     - ./skip.js || service-A/test1.sh
+//     - ./skip.js || service-A/test2.sh
+//     - ./skip.js || service-A/test3.sh
 
 const fs = require("fs");
 const { spawn, execFileSync } = require("child_process");

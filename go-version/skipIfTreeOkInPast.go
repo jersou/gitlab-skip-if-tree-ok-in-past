@@ -43,12 +43,12 @@ Usage in .gitlab-ci.yml file :
     stage: test
     image: alpine
     variables:
-      GIT_DEPTH: 1000
-    SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
+        GIT_DEPTH: 1000
+        SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
     script:
-      - ./skip-if-tree-ok-in-past || service-A/test1.sh
-      - ./skip-if-tree-ok-in-past || service-A/test2.sh
-      - ./skip-if-tree-ok-in-past || service-A/test3.sh
+        - ./skip-if-tree-ok-in-past || service-A/test1.sh
+        - ./skip-if-tree-ok-in-past || service-A/test2.sh
+        - ./skip-if-tree-ok-in-past || service-A/test3.sh
 `)
 }
 
