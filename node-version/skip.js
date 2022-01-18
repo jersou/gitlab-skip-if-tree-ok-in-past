@@ -27,7 +27,7 @@
 // image: jersou/alpine-git-nodejs-unzip
 // variables:
 //     GIT_DEPTH: 10000
-// SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
+//     SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
 // script:
 //   - ./skip.js || service-A/test1.sh
 //   - ./skip.js || service-A/test2.sh
