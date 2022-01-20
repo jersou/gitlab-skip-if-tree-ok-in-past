@@ -2,15 +2,15 @@
 // From https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past
 //    & https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
 // Implementation summary :
-//     1. Check if the script has already been completed : check /tmp/ci-skip. If file exists, exit, else :
+//     1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
 //     2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
 //     3. Get last 1000 successful jobs of the project
 //     4. Filter jobs : keep current job only
 //     5. For each job :
 //         1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
 //         2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" (see 2.)
-//         3. If the "git ls-tree" are equals, write true in /tmp/ci-skip and exit with code 0
-//     6. If no job found, write false in /tmp/ci-skip and exit with code > 0
+//         3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
+//     6. If no job found, write false in ci-skip file and exit with code > 0
 //
 // ⚠️ Requirements :
 //    - the variable SKIP_IF_TREE_OK_IN_PAST must contain the paths used by the job
@@ -49,7 +49,12 @@ const color = (color, msg) => console.error(`\x1b[${color}m  ${msg}  \x1b[0m`);
 const red = (msg) => color("1;41;30", msg);
 const yellow = (msg) => color("1;43;30", msg);
 const green = (msg) => color("1;42;30", msg);
-const ci_skip_path = `/tmp/ci-skip-${process.env.CI_PROJECT_ID}-${process.env.CI_JOB_ID}`;
+const ciBuildsDir = process.env.CI_BUILDS_DIR;
+const ciProjectDir = process.env.CI_PROJECT_DIR;
+const projectPath = ciProjectDir.startsWith(ciBuildsDir)
+  ? ciProjectDir
+  : ciBuildsDir + ciProjectDir.match(/(^\/[^\/]+)(.*)/)[2]; // remove first part of path
+const ciSkipPath = `${projectPath}/ci-skip-${process.env.CI_PROJECT_ID}-${process.env.CI_JOB_ID}`;
 const isVerbose = process.env.SKIP_CI_VERBOSE === "true";
 const verbose = (msg) => isVerbose && console.log(msg);
 
@@ -64,8 +69,8 @@ if (!process.env.API_READ_TOKEN) {
   process.exit(1);
 }
 
-if (fs.existsSync(ci_skip_path)) {
-  const content = fs.readFileSync(ci_skip_path, "utf8").trim();
+if (fs.existsSync(ciSkipPath)) {
+  const content = fs.readFileSync(ciSkipPath, "utf8").trim();
   verbose(`ci-skip file exists, content=${content}`);
   process.exit(content === "true" ? 0 : 3);
 }
@@ -125,8 +130,8 @@ function downloadFile(path, url) {
 async function extractArtifacts(job) {
   console.log(`job ${job.id} artifacts_expire_at: ${job.artifacts_expire_at}`);
   if (job.artifacts_expire_at) {
+    verbose(`Extract artifacts of job : ${job.Id}`);
     try {
-      verbose(`Extract artifacts of job : ${job.Id}`);
       execFileSync("unzip", ["-h"]);
     } catch (error) {
       red("unzip not found, skip artifacts dl/extract.");
@@ -145,14 +150,14 @@ async function extractArtifacts(job) {
     } catch (error) {
       console.error(error);
       red("artifacts not found, expired ? → Don't skip");
-      fs.writeFileSync(ci_skip_path, "false");
+      fs.writeFileSync(ciSkipPath, "false");
       process.exit(5);
     }
   }
 }
 
 function exitNotFound() {
-  fs.writeFileSync(ci_skip_path, "false");
+  fs.writeFileSync(ciSkipPath, "false");
   yellow("❌ tree not found in last 1000 success jobs of the project");
   process.exit(4);
 }
@@ -188,7 +193,7 @@ async function main() {
           );
           if (currentTree === tree) {
             await extractArtifacts(job);
-            fs.writeFileSync(ci_skip_path, "true");
+            fs.writeFileSync(ciSkipPath, "true");
             green(`✅ tree found in job ${job.web_url}`);
             process.exit(0);
           }

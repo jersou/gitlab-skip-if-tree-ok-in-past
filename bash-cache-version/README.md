@@ -1,10 +1,8 @@
+See ../.gitlab-ci.yml file exemple, job ".bash-api-version-ci-history", "
+SERVICE-A-cache" and "SERVICE-B-cache"
 
-See ../.gitlab-ci.yml file exemple, job ".bash-api-version-ci-history", "SERVICE-A-cache" and "SERVICE-B-cache"
-
-
-
-
-This implementation uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of the "state" :
+This implementation uses gitlab cache and `git ls-tree` & `git mktree` to
+generate the SHA-1 of the "state" :
 
 ```yaml
   # allow the 222 exit code : allow failure if tree is found in history
@@ -16,13 +14,13 @@ This implementation uses gitlab cache and `git ls-tree` & `git mktree` to genera
   before_script:
     # skip the job if the SHA-1 of the "$TREE_TO_CHECK" tree is in the history file
     - |
-      ! grep "^$(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):" .ci_ok_history \
+      ! grep "^$(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):" ci_ok_history \
       || exit 222
   after_script:
     # if job is successful, add the SHA-1 of the "$TREE_TO_CHECK" tree to the history file
     - |
       [ "$CI_JOB_STATUS" = success ] \
-       && echo $(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):${CI_JOB_ID} >> .ci_ok_history
+       && echo $(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):${CI_JOB_ID} >> ci_ok_history
 ```
 
 The command `git ls-tree HEAD -- $TREE_TO_CHECK` outputs :
@@ -35,19 +33,20 @@ The command `git ls-tree HEAD -- $TREE_TO_CHECK` outputs :
 ```
 
 Then, the command `git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree`
-outputs the SHA-1 of `$TREE_TO_CHECK` : `70552b00d642bfa259b1622674e85844d8711ad6`
+outputs the SHA-1
+of `$TREE_TO_CHECK` : `70552b00d642bfa259b1622674e85844d8711ad6`
 
-This SHA-1 is searched in the `.ci_ok_history` file, if it is found, the script stops
-with the code 222 (allowed), otherwise the job script continues.
+This SHA-1 is searched in the `ci_ok_history` file, if it is found, the script
+stops with the code 222 (allowed), otherwise the job script continues.
 
-If the job is successful, the SHA-1 is added to the `.ci_ok_history` file. This file is cached:
+If the job is successful, the SHA-1 is added to the `ci_ok_history` file. This
+file is cached:
 
 ```
   cache:
     key: "${CI_PROJECT_NAMESPACE}__${CI_PROJECT_NAME}__${CI_JOB_NAME}__ci_ok_history"
     policy: pull-push
-    untracked: true
     paths:
-      - .ci_ok_history
+      - ci_ok_history
 ```
 

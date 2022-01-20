@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -18,16 +19,19 @@ func printHelp() {
 	println(`Help :
 From https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past 
    & https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
+
+Version : go-api-version
+
 Implementation summary :
-    1. Check if the script has already been completed : check /tmp/ci-skip. If file exists, exit, else :
+    1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
     2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
     3. Get last successful jobs of the project
     4. Filter jobs : keep current job only
     5. For each job :
         1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
         2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" (see 2.)
-        3. If the "git ls-tree" are equals, write true in /tmp/ci-skip and exit with code 0
-    6. If no job found, write false in /tmp/ci-skip and exit with code > 0
+        3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
+    6. If no job found, write false in ci-skip file and exit with code > 0
 
 ⚠️  Requirements :
    - the variable SKIP_IF_TREE_OK_IN_PAST must contain the paths used by the job
@@ -75,13 +79,13 @@ func verbose(msg string) {
 }
 
 func red(msg string) {
-	fmt.Println(string("\033[1;41;30m"), " ", msg, " ", string("\033[0m"))
+	fmt.Println("\033[1;41;30m  ", msg, "  \033[0m")
 }
 func yellow(msg string) {
-	fmt.Println("\033[1;43;30m", " ", msg, " ", "\033[0m")
+	fmt.Println("\033[1;43;30m  ", msg, "  \033[0m")
 }
 func green(msg string) {
-	fmt.Println("\033[1;42;30m", " ", msg, " ", "\033[0m")
+	fmt.Println("\033[1;42;30m  ", msg, "  \033[0m")
 }
 
 func exitIfError(err error, msg string) {
@@ -112,7 +116,7 @@ func getTreeOfPaths(repository *git.Repository, hash plumbing.Hash, paths []stri
 			verbose("error: tree.FindEntry(string(path)) : " + path)
 			return "", err
 		}
-		entries += entry.Hash.String() + " " + string(path) + "\n"
+		entries += entry.Hash.String() + " " + path + "\n"
 	}
 	return entries, nil
 }
@@ -193,8 +197,20 @@ func extractArtifacts(job Job) {
 	}
 }
 
+func getProjectPath() string {
+	ciBuildsDir := os.Getenv("CI_BUILDS_DIR")
+	ciProjectDir := os.Getenv("CI_PROJECT_DIR")
+	if strings.HasPrefix(ciProjectDir, ciBuildsDir) {
+		return ciProjectDir + "/"
+	} else {
+		reg := regexp.MustCompile(`/([^/]+)(.*)`)
+		res := reg.ReplaceAllString(ciProjectDir, "${2}")
+		return ciBuildsDir + res + "/"
+	}
+}
+
 func getCiSkipPath() string {
-	return "/tmp/ci-skip-" + os.Getenv("CI_PROJECT_ID") + "-" + os.Getenv("CI_JOB_ID}")
+	return getProjectPath() + "ci-skip-" + os.Getenv("CI_PROJECT_ID") + "-" + os.Getenv("CI_JOB_ID")
 }
 
 func exitNotFound() {

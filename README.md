@@ -1,35 +1,39 @@
 # gitlab-skip-if-tree-ok-in-past tools
 
 This project contains 3 implementation of the issue described bellow :
+
 * a bash implementation, that require : bash, curl, git, unzip, fx
 * a NodeJS implementation, that require : git, nodejs, unzip
-* a Go implementation, that require : nothing except the 1.8Mo binary file "skip-if-tree-ok-in-past"
+* a Go implementation, that require : nothing except the 1.8Mo binary file "
+  skip-if-tree-ok-in-past"
 
-The POC describe in the issue bellow use gitlab-ci job cache to find OK trees, 
+The POC describe in the issue bellow use gitlab-ci job cache to find OK trees,
 but the implementations of the current projet use Gitlab API:
 
 ### Implementation summary :
 
-1. Check if the script has already been completed : check /tmp/ci-skip. If file 
- exists, exit, else :
-2. Get the "git ls-tree" of the tree "SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
+1. Check if the script has already been completed : check ci-skip file. If file
+   exists, exit, else :
+2. Get the "git ls-tree" of the tree "SKIP_IF_TREE_OK_IN_PAST" of the current
+   HEAD
 3. Get last successful jobs of the project
 4. Filter jobs : keep current job only
 5. For each job :
-   1. Get the "git ls-tree" of the tree "SKIP_IF_TREE_OK_IN_PAST"
-   2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" ( ⇧ 2.)
-   3. If the "git ls-tree" are equals, write true in /tmp/ci-skip and exit with code 0
-6. If no job found, write false in /tmp/ci-skip and exit with code > 0
+    1. Get the "git ls-tree" of the tree "SKIP_IF_TREE_OK_IN_PAST"
+    2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" ( ⇧ 2.)
+    3. If the "git ls-tree" are equals, write true in ci-skip file and exit with
+       code 0
+6. If no job found, write false in ci-skip file and exit with code > 0
 
-### ⚠️  Warning/Requirements :
+### ⚠️ Warning/Requirements :
 
 - the variable `SKIP_IF_TREE_OK_IN_PAST` must contain the paths used by the job
 - need `API_READ_TOKEN` (personal access tokens that have `read_api` scope)
 - set `GIT_DEPTH` variable to 1000 or more
 - if the nested jobs of current uses the dependencies key with current, the
- dependencies files need to be in an artifact
+  dependencies files need to be in an artifact
 - CI variables changes are not detected (Trees will be considered equal despite
- changes in variables)
+  changes in variables)
 
 ### Usage in .gitlab-ci.yml file :
 
@@ -50,16 +54,16 @@ SERVICE-A:
 
 ### Problem to solve
 
-On monorepo projects (especially), the jobs are run all the time, even
-if their state has already been successfully run previously. Time and
-resources could be saved by checking that the version of the files used
-by the job has already succeeded in the past.
+On monorepo projects (especially), the jobs are run all the time, even if their
+state has already been successfully run previously. Time and resources could be
+saved by checking that the version of the files used by the job has already
+succeeded in the past.
 
 ### Proposal
 
 An option in `.gtlab-ci.yml` file "idempotent_tree" (name to be determined)
-with an array of paths could be used to make a history of state that have
-passed the job with success:
+with an array of paths could be used to make a history of state that have passed
+the job with success:
 
 ```
 service-A:
@@ -74,7 +78,8 @@ service-A:
 
 A POC of this idea is operational here
 [jersou / Gitlab Tree Ok Cache](https://gitlab.com/jersou/gitlab-tree-ok-cache),
-it uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of the "state" :
+it uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of
+the "state" :
 
 ```yaml
   # allow the 222 exit code : allow failure if tree is found in history
@@ -86,13 +91,13 @@ it uses gitlab cache and `git ls-tree` & `git mktree` to generate the SHA-1 of t
   before_script:
     # skip the job if the SHA-1 of the "$TREE_TO_CHECK" tree is in the history file
     - |
-      ! grep "^$(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):" .ci_ok_history \
+      ! grep "^$(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):" ci_ok_history \
       || exit 222
   after_script:
     # if job is successful, add the SHA-1 of the "$TREE_TO_CHECK" tree to the history file
     - |
       [ "$CI_JOB_STATUS" = success ] \
-       && echo $(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):${CI_JOB_ID} >> .ci_ok_history
+       && echo $(git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree):${CI_JOB_ID} >> ci_ok_history
 ```
 
 The command `git ls-tree HEAD -- $TREE_TO_CHECK` outputs :
@@ -105,20 +110,21 @@ The command `git ls-tree HEAD -- $TREE_TO_CHECK` outputs :
 ```
 
 Then, the command `git ls-tree HEAD -- $TREE_TO_CHECK | tr / \| | git mktree`
-outputs the SHA-1 of `$TREE_TO_CHECK` : `70552b00d642bfa259b1622674e85844d8711ad6`
+outputs the SHA-1
+of `$TREE_TO_CHECK` : `70552b00d642bfa259b1622674e85844d8711ad6`
 
-This SHA-1 is searched in the `.ci_ok_history` file, if it is found, the script stops
-with the code 222 (allowed), otherwise the job script continues.
+This SHA-1 is searched in the `ci_ok_history` file, if it is found, the script
+stops with the code 222 (allowed), otherwise the job script continues.
 
-If the job is successful, the SHA-1 is added to the `.ci_ok_history` file. This file is cached:
+If the job is successful, the SHA-1 is added to the `ci_ok_history` file. This
+file is cached:
 
 ```
   cache:
     key: "${CI_PROJECT_NAMESPACE}__${CI_PROJECT_NAME}__${CI_JOB_NAME}__ci_ok_history"
     policy: pull-push
-    untracked: true
     paths:
-      - .ci_ok_history
+      - ci_ok_history
 ```
 
 This POC work fine, but need git in the docker image, and it would be much more
@@ -126,25 +132,26 @@ graceful if it was integrated in gitlab of course.
 
 ### Further details
 
-If this idea is implemented in gitlab, the problem of artifacts should be addressed,
-perhaps a link could be made to the artifact of the job that was found in the history.
-And if the artifacts are outdated, then the current job is finally executed to produce
-a new artifact (possibly activated/deactivated by an option).
+If this idea is implemented in gitlab, the problem of artifacts should be
+addressed, perhaps a link could be made to the artifact of the job that was
+found in the history. And if the artifacts are outdated, then the current job is
+finally executed to produce a new artifact (possibly activated/deactivated by an
+option).
 
 Or the job could be skipped like the "only:changes" option.
 
-
 #### Skip version implementation (see skip-version branch)
 
-1. Check if the process has already been completed : check file /tmp/ci-skip. If file found, exit, else :
+1. Check if the process has already been completed : check file ci-skip file. If
+   file found, exit, else :
 2. Get the SHA-1 of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
 3. Get last 1000 successful jobs of the project
 4. Filter jobs : keep current job only
 5. For each job :
-   1. Get the SHA-1 of the tree "$SKIP_IF_TREE_OK_IN_PAST"
-   2. Check if this SHA-1 equals the current HEAD SHA-1 (see 2.)
-   3. If the SHA-1s are equals, write true in /tmp/ci-skip and exit with code 0
-6. If no job found, write false in /tmp/ci-skip and exit with code > 0
+    1. Get the SHA-1 of the tree "$SKIP_IF_TREE_OK_IN_PAST"
+    2. Check if this SHA-1 equals the current HEAD SHA-1 (see 2.)
+    3. If the SHA-1s are equals, write true in ci-skip file and exit with code 0
+6. If no job found, write false in ci-skip file and exit with code > 0
 
 ### Links / references
 
