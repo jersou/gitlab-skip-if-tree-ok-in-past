@@ -44,12 +44,13 @@ fi
 # 2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD and generate SHA-1 of this output
 current_tree_sha=$(git ls-tree HEAD -- $SKIP_IF_TREE_OK_IN_PAST | tr / \| | git mktree)
 echo "false" >$ci_skip_path
+echo "skip-if-tree-ok-in-past : current_tree_sha=$current_tree_sha"
 
 # 3. Check if the SHA-1 is present in the history file
 job=$(tac ci_ok_history | grep -m 1 "^$current_tree_sha:" | cut -d: -f2)
 if [[ "$job" != "" ]] ; then
   # 4. If found, write true in "ci-skip", download and extract the artifact of the found job and exit with code 0
-  echo -e "\e[1;43;30m    ✅ $current_tree_sha tree found in job $job   \e[0m"
+  echo -e "\e[1;43;30m    ✅ tree found in job ${CI_JOB_URL%/*}/$job   \e[0m"
   if [[ "$SKIP_CI_NO_ARTIFACT" != true ]]; then
       curl -o artifact.zip --location "$CI_API_V4_URL/projects/${CI_PROJECT_ID}/jobs/$job/artifacts?job_token=$CI_JOB_TOKEN"
       unzip artifact.zip
