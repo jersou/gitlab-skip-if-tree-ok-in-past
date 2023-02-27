@@ -1,6 +1,17 @@
 variables:
   GIT_DEPTH: 1000
 
+go-api-version-build:
+  when: manual
+  stage: build
+  image: golang:1.20-bullseye
+  script:
+    - apt update && apt install -y upx-ucl && ./build.sh
+  artifacts:
+    when: on_success
+    paths:
+      - go-api-version/skip-if-tree-ok-in-past
+
 .base-job:
   stage: test
   artifacts:

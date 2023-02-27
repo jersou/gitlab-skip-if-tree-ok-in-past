@@ -11,4 +11,3 @@ go build -a -tags netgo -ldflags="-s -w -extldflags -static" -o skip-if-tree-ok-
 upx --brute skip-if-tree-ok-in-past
 
 
-
