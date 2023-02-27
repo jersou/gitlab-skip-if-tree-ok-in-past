@@ -6,7 +6,7 @@ go-api-version-build:
   stage: build
   image: golang:1.20-bullseye
   script:
-    - apt update && apt install -y upx-ucl && ./build.sh
+    - cd go-api-version/ && apt update && apt install -y upx-ucl && ./build.sh
   artifacts:
     when: on_success
     paths:
