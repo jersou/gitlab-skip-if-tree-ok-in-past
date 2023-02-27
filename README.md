@@ -4,7 +4,7 @@ This project contains 3 implementation of the issue described bellow :
 
 * a bash implementation, that require : bash, curl, git, unzip, fx
 * a NodeJS implementation, that require : git, nodejs, unzip
-* a Go implementation, that require : nothing except the 1.8Mo binary file "
+* a Go implementation, that require : nothing except the 1.9Mo binary file "
   skip-if-tree-ok-in-past"
 
 The POC describe in the issue bellow use gitlab-ci job cache to find OK trees,
@@ -161,3 +161,16 @@ Or the job could be skipped like the "only:changes" option.
 - https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
 
 
+## Requirements/versions matrix
+
+Requirement by versions :
+
+|        | Cache                                                     | API                                                          |
+|--------|-----------------------------------------------------------|--------------------------------------------------------------|
+| Bash   | bash, curl, git, unzip                                    | bash, curl, git, unzip, fx                                   |
+| Node   | nodejs, unzip, git                                        | nodejs, unzip, git                                           |
+| Deno   | N/A                                                       | deno, unzip, git                                             |
+| Go     | **none !**                                                | **none !**                                                   |
+| Global | SKIP_IF_TREE_OK_IN_PAST variable,<br>ci-skip gitlab cache | SKIP_IF_TREE_OK_IN_PAST variable,<br>API_READ_TOKEN variable |
+
+→ the go version "embeds" all requirements (git/unzip/http)
