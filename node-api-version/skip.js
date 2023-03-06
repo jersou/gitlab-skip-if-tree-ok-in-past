@@ -162,7 +162,18 @@ function exitNotFound() {
   process.exit(4);
 }
 
+ function checkTreeExists() {
+  const paths  = process.env.SKIP_IF_TREE_OK_IN_PAST.split(" ")
+  for (const path of paths) {
+    if(!fs.existsSync(path)){
+      red(`❌ SKIP_IF_TREE_OK_IN_PAST path "${path}" not found !`);
+      process.exit(6);
+    }
+  }
+}
+
 async function main() {
+  checkTreeExists()
   const currentTree = getTree("HEAD");
   verbose(
     "------------------------------ Current tree : ----------------------------------\n" +
