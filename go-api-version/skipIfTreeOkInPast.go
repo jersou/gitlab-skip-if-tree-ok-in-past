@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func printHelp() {
@@ -40,7 +41,9 @@ Implementation summary :
    - need API_READ_TOKEN (personal access tokens that have read_api scope)
    - set GIT_DEPTH variable to 1000 or more
 
-Set env var SKIP_CI_VERBOSE=true to enable verbose log
+Set the env var SKIP_CI_VERBOSE=true to enable verbose log
+
+Set the env var FAIL_IF_ARTIFACTS_EXPIRED=true to fail if the artifact is expired
 
 Usage in .gitlab-ci.yml file :
   SERVICE-A:
@@ -48,7 +51,7 @@ Usage in .gitlab-ci.yml file :
     image: alpine
     variables:
         GIT_DEPTH: 1000
-        SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip.sh
+        SKIP_IF_TREE_OK_IN_PAST: service-A LIB-1 .gitlab-ci.yml skip-if-tree-ok-in-past
     script:
         - ./skip-if-tree-ok-in-past || service-A/test1.sh
         - ./skip-if-tree-ok-in-past || service-A/test2.sh
@@ -72,6 +75,7 @@ type Job struct {
 	}
 }
 
+// print msg only if SKIP_CI_VERBOSE env var == true
 func verbose(msg string) {
 	if os.Getenv("SKIP_CI_VERBOSE") == "true" {
 		println(msg)
@@ -90,11 +94,14 @@ func green(msg string) {
 
 func exitIfError(err error, msg string) {
 	if err != nil {
-		red("exitIfError : " + msg)
 		red(fmt.Sprintf("error: %s", err))
-		_ = os.WriteFile(getCiSkipPath(), []byte("false"), 0644)
-		os.Exit(1)
+		exitError(msg)
 	}
+}
+func exitError(msg string) {
+	red("exitIfError : " + msg)
+	_ = os.WriteFile(getCiSkipPath(), []byte("false"), 0644)
+	os.Exit(1)
 }
 
 func getTreeOfPaths(repository *git.Repository, hash plumbing.Hash, paths []string) (string, error) {
@@ -183,17 +190,28 @@ func extractArtifacts(job Job) {
 	verbose("Extract artifacts of job : " + strconv.Itoa(job.Id))
 	println("job", job.Id, "artifacts_expire_at:", job.Artifacts_expire_at)
 	if job.Artifacts_expire_at != "" {
-		artifactsPath := "artifacts.zip"
-		println("Download", artifactsPath)
-		url := os.Getenv("CI_API_V4_URL") +
-			"/projects/" + os.Getenv("CI_PROJECT_ID") +
-			"/jobs/" + strconv.Itoa(job.Id) +
-			"/artifacts?job_token=" + os.Getenv("CI_JOB_TOKEN")
-		downloadFile(artifactsPath, url)
-		println("unzip", artifactsPath)
-		extractArchive(artifactsPath, "./")
-		verbose("Remove file : " + artifactsPath)
-		_ = os.Remove(artifactsPath)
+		parseExpireAt, err := time.Parse(time.RFC3339, job.Artifacts_expire_at)
+	    exitIfError(err, "expire_at parse error")
+		isExpired := parseExpireAt.Before(time.Now())
+		if isExpired {
+			if os.Getenv("FAIL_IF_ARTIFACTS_EXPIRED") == "true" {
+				exitError( "Artifact is expired")
+			} else {
+				yellow("Artifact is expired, we ignore it")
+			}
+		} else {
+			artifactsPath := "artifacts.zip"
+			println("Download", artifactsPath)
+			url := os.Getenv("CI_API_V4_URL") +
+				"/projects/" + os.Getenv("CI_PROJECT_ID") +
+				"/jobs/" + strconv.Itoa(job.Id) +
+				"/artifacts?job_token=" + os.Getenv("CI_JOB_TOKEN")
+			downloadFile(artifactsPath, url)
+			println("unzip", artifactsPath)
+			extractArchive(artifactsPath, "./")
+			verbose("Remove file : " + artifactsPath)
+			_ = os.Remove(artifactsPath)
+		}
 	}
 }
 
