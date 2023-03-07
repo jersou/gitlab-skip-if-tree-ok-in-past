@@ -184,7 +184,7 @@ async function main() {
   let commitCheckedSameRef = 0;
   let commitCheckedSameJob = 0;
   let jobChecked = 0;
-  const ciCommitRefName = process.envCI_COMMIT_REF_NAME;
+  const ciCommitRefName = process.env.CI_COMMIT_REF_NAME;
 
   for (let page = 0; page < pageToFetchMax; page++) {
     const projectJobs = await fetchJson(
