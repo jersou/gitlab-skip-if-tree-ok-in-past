@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="go test github.com/jersou/gitlab-skip-if-tree-ok-in-past" type="GoTestRunConfiguration" factoryName="Go Test">
+    <module name="go-api-version" />
+    <working_directory value="$PROJECT_DIR$/go-api-version" />
+    <kind value="PACKAGE" />
+    <package value="github.com/jersou/gitlab-skip-if-tree-ok-in-past" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <framework value="gotest" />
+    <method v="2" />
+  </configuration>
+</component>

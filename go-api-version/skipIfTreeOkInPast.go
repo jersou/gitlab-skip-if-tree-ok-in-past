@@ -7,6 +7,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 )
 
 func printHelp() {
-	println(`Help :
+	log.Println(`Help :
 From https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past 
    & https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
 
@@ -55,8 +56,7 @@ Usage in .gitlab-ci.yml file :
     script:
         - ./skip-if-tree-ok-in-past || service-A/test1.sh
         - ./skip-if-tree-ok-in-past || service-A/test2.sh
-        - ./skip-if-tree-ok-in-past || service-A/test3.sh
-`)
+        - ./skip-if-tree-ok-in-past || service-A/test3.sh`)
 }
 
 const pageToFetchMax = 5
@@ -78,18 +78,18 @@ type Job struct {
 // print msg only if SKIP_CI_VERBOSE env var == true
 func verbose(msg string) {
 	if os.Getenv("SKIP_CI_VERBOSE") == "true" {
-		println(msg)
+		log.Println(msg)
 	}
 }
 
 func red(msg string) {
-	fmt.Println("\033[1;41;30m  ", msg, "  \033[0m")
+	log.Println("\033[1;41;30m  ", msg, "  \033[0m")
 }
 func yellow(msg string) {
-	fmt.Println("\033[1;43;30m  ", msg, "  \033[0m")
+	log.Println("\033[1;43;30m  ", msg, "  \033[0m")
 }
 func green(msg string) {
-	fmt.Println("\033[1;42;30m  ", msg, "  \033[0m")
+	log.Println("\033[1;42;30m  ", msg, "  \033[0m")
 }
 
 func exitIfError(err error, msg string) {
@@ -126,6 +126,18 @@ func getTreeOfPaths(repository *git.Repository, hash plumbing.Hash, paths []stri
 		entries += entry.Hash.String() + " " + path + "\n"
 	}
 	return entries, nil
+}
+
+func getProjectPath() string {
+	ciBuildsDir := os.Getenv("CI_BUILDS_DIR")
+	ciProjectDir := os.Getenv("CI_PROJECT_DIR")
+	if strings.HasPrefix(ciProjectDir, ciBuildsDir) {
+		return ciProjectDir + "/"
+	} else {
+		reg := regexp.MustCompile(`/([^/]+)(.*)`)
+		res := reg.ReplaceAllString(ciProjectDir, "${2}")
+		return ciBuildsDir + res + "/"
+	}
 }
 
 func getProjectJobs(page int) []Job {
@@ -191,11 +203,11 @@ func extractArtifacts(job Job) {
 	println("job", job.Id, "artifacts_expire_at:", job.Artifacts_expire_at)
 	if job.Artifacts_expire_at != "" {
 		parseExpireAt, err := time.Parse(time.RFC3339, job.Artifacts_expire_at)
-	    exitIfError(err, "expire_at parse error")
+		exitIfError(err, "expire_at parse error")
 		isExpired := parseExpireAt.Before(time.Now())
 		if isExpired {
 			if os.Getenv("FAIL_IF_ARTIFACTS_EXPIRED") == "true" {
-				exitError( "Artifact is expired")
+				exitError("Artifact is expired")
 			} else {
 				yellow("Artifact is expired, we ignore it")
 			}
@@ -212,18 +224,6 @@ func extractArtifacts(job Job) {
 			verbose("Remove file : " + artifactsPath)
 			_ = os.Remove(artifactsPath)
 		}
-	}
-}
-
-func getProjectPath() string {
-	ciBuildsDir := os.Getenv("CI_BUILDS_DIR")
-	ciProjectDir := os.Getenv("CI_PROJECT_DIR")
-	if strings.HasPrefix(ciProjectDir, ciBuildsDir) {
-		return ciProjectDir + "/"
-	} else {
-		reg := regexp.MustCompile(`/([^/]+)(.*)`)
-		res := reg.ReplaceAllString(ciProjectDir, "${2}")
-		return ciBuildsDir + res + "/"
 	}
 }
 
@@ -313,9 +313,9 @@ func main() {
 				commitCheckedSameJob >= commitToCheckSameJobMax ||
 				commitCheckedSameRef >= commitToCheckSameRefMax {
 				verbose("[exit not found] : ")
-				verbose(fmt.Sprint("jobChecked : %d /%d ", jobChecked, jobToCheckMax))
-				verbose(fmt.Sprint("commitCheckedSameJob : %d /%d ", commitCheckedSameJob, commitToCheckSameJobMax))
-				verbose(fmt.Sprint("commitCheckedSameRef : %d /%d ", commitCheckedSameRef, commitToCheckSameRefMax))
+				verbose(fmt.Sprintf("jobChecked : %d /%d ", jobChecked, jobToCheckMax))
+				verbose(fmt.Sprintf("commitCheckedSameJob : %d /%d ", commitCheckedSameJob, commitToCheckSameJobMax))
+				verbose(fmt.Sprintf("commitCheckedSameRef : %d /%d ", commitCheckedSameRef, commitToCheckSameRefMax))
 				exitNotFound()
 			}
 		}

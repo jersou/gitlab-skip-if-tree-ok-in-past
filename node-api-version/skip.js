@@ -58,6 +58,11 @@ const ciSkipPath = `${projectPath}/ci-skip-${process.env.CI_PROJECT_ID}-${proces
 const isVerbose = process.env.SKIP_CI_VERBOSE === "true";
 const verbose = (msg) => isVerbose && console.log(msg);
 
+if (process.env.SKIP_SKIP_CI === "true") {
+  yellow("⚠️ The SKIP_SKIP_CI === true → skip the check");
+  process.exit(1);
+}
+
 if (!process.env.SKIP_IF_TREE_OK_IN_PAST) {
   red(
     "⚠️ The SKIP_IF_TREE_OK_IN_PAST variable is empty, set the list of paths to check"
