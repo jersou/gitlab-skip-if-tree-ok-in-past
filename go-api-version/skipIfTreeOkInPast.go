@@ -75,6 +75,13 @@ type Job struct {
 	}
 }
 
+func exit(code int) int {
+	if os.Getenv("GO_TEST") != "true" {
+		os.Exit(code)
+	}
+	return code
+}
+
 // print msg only if SKIP_CI_VERBOSE env var == true
 func verbose(msg string) {
 	if os.Getenv("SKIP_CI_VERBOSE") == "true" {
@@ -92,16 +99,18 @@ func green(msg string) {
 	log.Println("\033[1;42;30m  ", msg, "  \033[0m")
 }
 
-func exitIfError(err error, msg string) {
+func exitIfError(err error, msg string) int {
 	if err != nil {
 		red(fmt.Sprintf("error: %s", err))
-		exitError(msg)
+		return exitError(msg)
 	}
+	return -1
 }
-func exitError(msg string) {
+
+func exitError(msg string) int {
 	red("exitIfError : " + msg)
 	_ = os.WriteFile(getCiSkipPath(), []byte("false"), 0644)
-	os.Exit(1)
+	return exit(1)
 }
 
 func getTreeOfPaths(repository *git.Repository, hash plumbing.Hash, paths []string) (string, error) {
@@ -157,6 +166,18 @@ func getProjectJobs(page int) []Job {
 	return jobs
 }
 
+func downloadFile(filepath string, url string) {
+	verbose("DownloadFile file : " + url)
+	resp, err := http.Get(url)
+	exitIfError(err, "downloadFile::http.Get(url)")
+	defer resp.Body.Close()
+	out, err := os.Create(filepath)
+	exitIfError(err, "downloadFile::os.Create(filepath)")
+	defer out.Close()
+	_, err = io.Copy(out, resp.Body)
+	exitIfError(err, "downloadFile::io.Copy(out, resp.Body)")
+}
+
 func extractArchive(archivePath string, outputPath string) {
 	verbose("Extract archive : " + archivePath)
 	archive, err := zip.OpenReader(archivePath)
@@ -184,18 +205,6 @@ func extractArchive(archivePath string, outputPath string) {
 		err = fileInArchive.Close()
 		exitIfError(err, "extractArchive::fileInArchive.Close()")
 	}
-}
-
-func downloadFile(filepath string, url string) {
-	verbose("DownloadFile file : " + url)
-	resp, err := http.Get(url)
-	exitIfError(err, "downloadFile::http.Get(url)")
-	defer resp.Body.Close()
-	out, err := os.Create(filepath)
-	exitIfError(err, "downloadFile::os.Create(filepath)")
-	defer out.Close()
-	_, err = io.Copy(out, resp.Body)
-	exitIfError(err, "downloadFile::io.Copy(out, resp.Body)")
 }
 
 func extractArtifacts(job Job) {
@@ -231,27 +240,27 @@ func getCiSkipPath() string {
 	return getProjectPath() + "ci-skip-" + os.Getenv("CI_PROJECT_ID") + "-" + os.Getenv("CI_JOB_ID")
 }
 
-func exitNotFound() {
+func exitNotFound() int {
 	_ = os.WriteFile(getCiSkipPath(), []byte("false"), 0644)
 	yellow("❌ tree not found in last jobs of the project")
-	os.Exit(4)
+	return exit(4)
 }
 
-func initCheck() {
-	if len(os.Args) > 1 {
+func initCheck( Args []string) int {
+	if len(Args) > 1 {
 		printHelp()
-		os.Exit(1)
+		return exit(1)
 	}
 	if os.Getenv("SKIP_IF_TREE_OK_IN_PAST") == "" {
 		red("Error : SKIP_IF_TREE_OK_IN_PAST is empty")
 		printHelp()
-		os.Exit(1)
+		return exit(1)
 	}
 	verbose("SKIP_IF_TREE_OK_IN_PAST=" + os.Getenv("SKIP_IF_TREE_OK_IN_PAST"))
 	if os.Getenv("API_READ_TOKEN") == "" {
 		red("Error : API_READ_TOKEN is empty")
 		printHelp()
-		os.Exit(2)
+		return exit(2)
 	}
 	ciSkipPath := getCiSkipPath()
 	verbose("ciSkipPath=" + ciSkipPath)
@@ -260,15 +269,16 @@ func initCheck() {
 		verbose("ci-skip file exists, content=" + string(content))
 		exitIfError(err, "initCheck::os.ReadFile(ciSkipPath)")
 		if string(content) == "true" {
-			os.Exit(0)
+			return exit(0)
 		} else {
-			os.Exit(3)
+			return exit(3)
 		}
 	}
+	return -1
 }
 
 func main() {
-	initCheck()
+	initCheck(os.Args)
 	ciJobName := os.Getenv("CI_JOB_NAME")
 	ciCommitRefName := os.Getenv("CI_COMMIT_REF_NAME")
 	repository, err := git.PlainOpen(".")
@@ -284,8 +294,9 @@ func main() {
 	commitCheckedSameRef := 0
 	commitCheckedSameJob := 0
 	jobChecked := 0
+	found := false
 
-	for page := 1; page <= pageToFetchMax; page++ {
+	for page := 1; page <= pageToFetchMax && !found; page++ {
 		verbose("process page " + strconv.Itoa(page))
 		jobs := getProjectJobs(page)
 		for _, job := range jobs {
@@ -300,7 +311,8 @@ func main() {
 					err := os.WriteFile(getCiSkipPath(), []byte("true"), 0644)
 					exitIfError(err, "main::os.WriteFile")
 					green("✅ tree found in job " + job.Web_url)
-					os.Exit(0)
+					found = true
+					break
 				}
 				if job.Ref == ciCommitRefName {
 					commitCheckedSameRef++
@@ -320,5 +332,7 @@ func main() {
 			}
 		}
 	}
-	exitNotFound()
+	if !found {
+		exitNotFound()
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	untar "github.com/jersou/gitlab-skip-if-tree-ok-in-past/test"
@@ -12,7 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -110,43 +111,117 @@ func Test_green(t *testing.T) {
 }
 
 func Test_exitError(t *testing.T) {
-	if os.Getenv("TEST_EXIT_FORK") == "true" {
-		exitError("test")
-	} else {
-		cmd := exec.Command(os.Args[0], "-test.run=Test_exitError")
-		cmd.Env = append(os.Environ(), "TEST_EXIT_FORK=true")
-		err := cmd.Run()
-		if e, ok := err.(*exec.ExitError); !ok || e.ExitCode() != 1 {
-			t.Fatalf("process ran with err %v, want exit status 1", e.ExitCode())
-		}
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+	exitCode := exitError("test")
+	if exitCode != 1 {
+		t.Fatalf("process ran with err %v, want exit status 1", exitCode)
 	}
 }
 
 func Test_exitIfError_no_error(t *testing.T) {
-	if os.Getenv("TEST_EXIT_FORK") == "true" {
-		exitIfError(nil, "test")
-	} else {
-		cmd := exec.Command(os.Args[0], "-test.run=Test_exitIfError")
-		cmd.Env = append(os.Environ(), "TEST_EXIT_FORK=true")
-		err := cmd.Run()
-		if e, ok := err.(*exec.ExitError); !ok {
-			t.Fatalf("process ran with err %v, want exit status 0", e.ExitCode())
-		}
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+	exitCode := exitIfError(nil, "test")
+	if exitCode != -1 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
 	}
 }
 
 func Test_exitIfError_error(t *testing.T) {
-	if os.Getenv("TEST_EXIT_FORK") == "true" {
-		exitIfError(errors.New("err"), "test")
-	} else {
-		cmd := exec.Command(os.Args[0], "-test.run=Test_exitIfError")
-		cmd.Env = append(os.Environ(), "TEST_EXIT_FORK=true")
-		err := cmd.Run()
-		if e, ok := err.(*exec.ExitError); !ok || e.ExitCode() != 1 {
-			t.Fatalf("process ran with err %v, want exit status 1", e.ExitCode())
-		}
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+	exitCode := exitIfError(errors.New("err"), "test")
+	if exitCode != 1 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
 	}
 }
+
+func Test_exitNotFound(t *testing.T) {
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+
+	tmpDir, err := ioutil.TempDir("", "Test_exitNotFound")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+	defer os.Unsetenv("CI_PROJECT_ID")
+	os.Setenv("CI_PROJECT_ID", "CI_PROJECT_ID")
+	defer os.Unsetenv("CI_JOB_ID")
+	os.Setenv("CI_JOB_ID", "CI_JOB_ID")
+
+	defer os.Unsetenv("CI_BUILDS_DIR")
+	os.Setenv("CI_BUILDS_DIR", tmpDir)
+	defer os.Unsetenv("CI_PROJECT_DIR")
+	os.Setenv("CI_PROJECT_DIR", tmpDir)
+
+	exitCode := exitNotFound()
+	if exitCode != 4 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+}
+
+func Test_initCheck(t *testing.T) {
+	defer os.Unsetenv("GO_TEST")
+	os.Setenv("GO_TEST", "true")
+	if exitCode := initCheck([]string{"test", "test"}); exitCode != 1 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+	if exitCode := initCheck([]string{}); exitCode != 1 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+	defer os.Unsetenv("SKIP_IF_TREE_OK_IN_PAST")
+	os.Setenv("SKIP_IF_TREE_OK_IN_PAST", "file1 file2")
+	if exitCode := initCheck([]string{}); exitCode != 2 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+
+	tmpDir, err := ioutil.TempDir("", "Test_initCheck")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	defer os.Unsetenv("CI_BUILDS_DIR")
+	os.Setenv("CI_BUILDS_DIR", tmpDir)
+	defer os.Unsetenv("CI_PROJECT_DIR")
+	os.Setenv("CI_PROJECT_DIR", tmpDir)
+	defer os.Unsetenv("CI_PROJECT_ID")
+	os.Setenv("CI_PROJECT_ID", "CI_PROJECT_ID")
+	defer os.Unsetenv("CI_JOB_ID")
+	os.Setenv("CI_JOB_ID", "CI_JOB_ID")
+
+	f, err := os.Create(tmpDir + "/ci-skip-CI_PROJECT_ID-CI_JOB_ID")
+
+	defer os.Unsetenv("API_READ_TOKEN")
+	os.Setenv("API_READ_TOKEN", "API_READ_TOKEN")
+
+	if exitCode := initCheck([]string{}); exitCode != 3 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+
+	f.WriteString("true")
+	if exitCode := initCheck([]string{}); exitCode != 0 {
+		t.Fatalf("exitIfError exit with code %v", exitCode)
+	}
+}
+
+//func Test_extractArtifacts(t *testing.T){
+//	// TODO
+//
+//	tmpDir, err := ioutil.TempDir("", "Test_getTreeOfPaths")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer os.RemoveAll(tmpDir)
+//
+//	os.Chdir(tmpDir)
+//
+//}
 
 func Test_getTreeOfPaths(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "Test_getTreeOfPaths")
@@ -193,9 +268,7 @@ func Test_getTreeOfPaths(t *testing.T) {
 }
 
 func Test_getProjectJobs(t *testing.T) {
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		println(r)
 		w.Write([]byte(`[{"Id":123}]`))
 	}))
 
@@ -213,5 +286,48 @@ func Test_getProjectJobs(t *testing.T) {
 	if string(got) != expected {
 		t.Errorf("got %v, want %v", string(got), expected)
 	}
+}
 
+func Test_downloadFile(t *testing.T) {
+	tmpFile, err := ioutil.TempFile("", "Test_downloadFile")
+	defer os.Remove(tmpFile.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Test_downloadFile"))
+	}))
+	downloadFile(tmpFile.Name(), server.URL)
+	content, _ := os.ReadFile(tmpFile.Name())
+	expected := "Test_downloadFile"
+
+	if string(content) != expected {
+		t.Errorf("got %v, want %v", string(content), expected)
+	}
+}
+
+func Test_extractArchive(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "Test_extractArchive")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	extractArchive("test/artifact.zip", tmpDir)
+
+	paths := ""
+
+	filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		paths += path[len(tmpDir):] + "\n"
+		return nil
+	})
+	expected := "\n/artifact\n/artifact/a\n/artifact/b\n/artifact/c\n/artifact/folder1\n/artifact/folder1/d\n/artifact/folder1/e\n/artifact/folder1/f\n/artifact/folder2\n/artifact/folder2/g\n/artifact/folder2/h\n/artifact/folder2/i\n"
+
+	if paths != expected {
+		t.Errorf("got <%v>, want <%v>", paths, expected)
+	}
 }
