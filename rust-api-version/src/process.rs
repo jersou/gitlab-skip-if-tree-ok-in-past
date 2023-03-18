@@ -18,7 +18,7 @@ async fn check_skip_is_done(path_str: &str) -> Option<bool> {
         match content {
             Ok(content_str) => {
                 let skip_is_ok = content_str.eq("true");
-                verbose!("skip-ci file exists : {}", skip_is_ok);
+                verbose!("skip-ci file exists with this content : {}", content_str);
                 Some(skip_is_ok)
             }
             Err(_) => {
@@ -63,7 +63,6 @@ async fn find_last_job_ok(config: &Config) -> anyhow::Result<Option<GitlabJob>> 
 
     // 2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
     let tree_of_head = get_tree_of_paths(&repo, head.to_string().as_str(), &skip_files_paths)?;
-    verbose!("tree_of_head = {tree_of_head}");
 
     let mut commit_to_check_same_ref = 0;
     let mut commit_to_check_same_job = 0;
