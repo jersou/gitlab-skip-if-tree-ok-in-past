@@ -1,11 +1,21 @@
-# gitlab-skip-if-tree-ok-in-past tools
+# gitlab skip-if-tree-ok-in-past
 
-This project contains 3 implementation of the issue described bellow :
+**To skip the running of a job if another job has already succeeded in the past
+with the same versions of the files on which the job depends.**
+
+This project contains 5 implementations of the issue described bellow :
 
 * a bash implementation, that require : bash, curl, git, unzip, fx
 * a NodeJS implementation, that require : git, nodejs, unzip
-* a Go implementation, that require : nothing except the 1.9Mo binary file "
-  skip-if-tree-ok-in-past"
+* a Deno implementation, that require : git, nodejs, unzip
+* a Go implementation, that require : nothing except the 1.9Mo binary file `skip-if-tree-ok-in-past`
+* **a Rust implementation**, that require : nothing except the 1.4Mo binary file `skip-if-tree-ok-in-past`
+
+**The recommended version is the Rust which has no dependency and is 95% covered by tests.**
+
+→ see [rust-api-version/README.md](rust-api-version/README.md)
+
+---
 
 The POC describe in the issue bellow use gitlab-ci job cache to find OK trees,
 but the implementations of the current projet use Gitlab API:
@@ -49,6 +59,23 @@ SERVICE-A:
       - ./skip-if-tree-ok-in-past || service-A/test2.sh
       - ./skip-if-tree-ok-in-past || service-A/test3.sh
 ```
+
+## Requirements/versions matrix
+
+Requirement by versions :
+
+|        | Cache                                                     | API                                                          |
+|--------|-----------------------------------------------------------|--------------------------------------------------------------|
+| Bash   | bash, curl, git, unzip                                    | bash, curl, git, unzip, fx                                   |
+| Node   | nodejs, unzip, git                                        | nodejs, unzip, git                                           |
+| Deno   | N/A                                                       | deno, unzip, git                                             |
+| Go     | **none !**                                                | **none !**                                                   |
+| Rust   | N/A                                                       | **none !**                                                   |
+| Global | SKIP_IF_TREE_OK_IN_PAST variable,<br>ci-skip gitlab cache | SKIP_IF_TREE_OK_IN_PAST variable,<br>API_READ_TOKEN variable |
+
+→ the go version "embeds" all requirements (git/unzip/http)
+
+---
 
 ## [The gitlab issue #350212 :](https://gitlab.com/gitlab-org/gitlab/-/issues/350212) Add "skip if sub tree is ok in the past" job option, useful in monorepos ~= Idempotent job
 
@@ -159,18 +186,3 @@ Or the job could be skipped like the "only:changes" option.
 - https://gitlab.com/jersou/gitlab-tree-ok-cache
 - https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past
 - https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
-
-
-## Requirements/versions matrix
-
-Requirement by versions :
-
-|        | Cache                                                     | API                                                          |
-|--------|-----------------------------------------------------------|--------------------------------------------------------------|
-| Bash   | bash, curl, git, unzip                                    | bash, curl, git, unzip, fx                                   |
-| Node   | nodejs, unzip, git                                        | nodejs, unzip, git                                           |
-| Deno   | N/A                                                       | deno, unzip, git                                             |
-| Go     | **none !**                                                | **none !**                                                   |
-| Global | SKIP_IF_TREE_OK_IN_PAST variable,<br>ci-skip gitlab cache | SKIP_IF_TREE_OK_IN_PAST variable,<br>API_READ_TOKEN variable |
-
-→ the go version "embeds" all requirements (git/unzip/http)
