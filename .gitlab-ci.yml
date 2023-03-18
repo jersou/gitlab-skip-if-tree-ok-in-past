@@ -145,6 +145,28 @@ SERVICE-B-go-api:
     - time go-api-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
 
 ########################################################################################################################
+
+SERVICE-A-rust-api:
+  image: alpine
+  extends: .base-job
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-A _example/LIB-1/test.sh _example/LIB-2 .gitlab-ci.yml rust-api-version/skip-if-tree-ok-in-past
+  script:
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-A/test.sh
+
+SERVICE-B-rust-api:
+  image: alpine
+  extends: .base-job
+  variables:
+    SKIP_IF_TREE_OK_IN_PAST: _example/service-B _example/LIB-2 .gitlab-ci.yml rust-api-version/skip-if-tree-ok-in-past
+  script:
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+    - time rust-api-version/skip-if-tree-ok-in-past || _example/service-B/test.sh
+
+########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
 

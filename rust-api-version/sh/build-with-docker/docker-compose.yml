@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+
+  build-rust-api-version:
+    image: build-rust-api-version-image
+    build:
+      context: ../..
+      dockerfile: sh/build-with-docker/Dockerfile
+    volumes:
+      - ../../:/out
+      - /home/user
+    user: $UID:$GID
+    working_dir: /src
+    command: ["/bin/sh", "-c", "echo '\e[1;41;39m  Think about redoing : docker compose build !\e[0m' && cp /src/skip-if-tree-ok-in-past /out/skip-if-tree-ok-in-past"]
+    environment:
+      HOME: /home/user

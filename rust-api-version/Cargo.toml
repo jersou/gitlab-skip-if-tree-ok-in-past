@@ -1,0 +1,28 @@
+[package]
+name = "gitlab-skip-if-tree-ok-in-past-rust-api-version"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+# to generate small binary : https://github.com/johnthagen/min-sized-rust
+strip = true  # Automatically strip symbols from the binary.
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[dependencies]
+zip = {version = "0.6.4", features = ["default"] }
+git2 = { version = "0.16.1", default-features = false }
+tokio = { version = "1.26.0", features = ["fs","macros"] }
+hyper = {version = "0.14.25", features = ["client","tcp","http1"]} # "http2"
+tempdir = "0.3.7"
+serde = { version = "1.0.156", features = ["derive"] }
+serde_json = { version ="1.0.94", features = ["default"] }
+anyhow = "1.0.69"
+
+[dev-dependencies]
+gag = "1.0.0"
+temp-env = "0.3.2"
+httptest = "0.15.4"
+cargo-tarpaulin = "0.25.1"

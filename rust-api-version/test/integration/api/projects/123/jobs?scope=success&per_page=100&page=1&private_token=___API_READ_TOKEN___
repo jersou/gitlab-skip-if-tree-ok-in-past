@@ -1,0 +1,24 @@
+[
+  {
+    "artifacts_expire_at": "2023-03-12T19:59:33.250Z",
+    "commit": {
+      "id": "2121212121212121212121212121212121212121"
+    },
+    "id": 12345678,
+    "name": "jobA",
+    "ref": "branch1",
+    "status": "success",
+    "web_url": "https://gitlab.localhost/skip/skip-rs/-/jobs/12345678"
+  },
+  {
+    "artifacts_expire_at": "2023-03-12T19:59:33.250Z",
+    "commit": {
+      "id": "5e694dadd2979a2680c98c88a2f98df9787947d2"
+    },
+    "id": 12345679,
+    "name": "jobA",
+    "ref": "branch2",
+    "status": "success",
+    "web_url": "https://gitlab.localhost/skip/skip-rs/-/jobs/12345679"
+  }
+]

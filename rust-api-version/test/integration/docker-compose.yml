@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+
+  gitlab-fake-api:
+    image: nginx:1.23.3-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./api:/usr/share/nginx/html/api:ro
+
+  rust-test-scratch-ok:
+    image: scratch-image
+    build:
+     context: ..
+     dockerfile: integration/scratch-image/Dockerfile
+    volumes:
+      - ../../skip-if-tree-ok-in-past:/skip-if-tree-ok-in-past:ro
+    entrypoint: ["/skip-if-tree-ok-in-past"]
+    working_dir: /repo
+    environment:
+      SKIP_CI_VERBOSE: true
+      CI_API_V4_URL: http://gitlab-fake-api/api/
+      SKIP_IF_TREE_OK_IN_PAST: root-1
+      API_READ_TOKEN: ___API_READ_TOKEN___
+      CI_PROJECT_ID: 123
+      CI_JOB_ID: 456
+      CI_COMMIT_REF_NAME: branch2
+      CI_PROJECT_DIR: /repo
+      CI_JOB_NAME: jobA
+      SKIP_CI_PAGE_TO_FETCH_MAX: 1
+
+  rust-test-scratch-ko:
+    image: scratch-image
+    build:
+     context: ..
+     dockerfile: integration/scratch-image/Dockerfile
+    volumes:
+      - ../../skip-if-tree-ok-in-past:/skip-if-tree-ok-in-past:ro
+    entrypoint: ["/skip-if-tree-ok-in-past"]
+    working_dir: /repo
+    environment:
+      SKIP_CI_VERBOSE: true
+      CI_API_V4_URL: http://gitlab-fake-api/api/
+      SKIP_IF_TREE_OK_IN_PAST: root-2
+      API_READ_TOKEN: ___API_READ_TOKEN___
+      CI_PROJECT_ID: 123
+      CI_JOB_ID: 456
+      CI_COMMIT_REF_NAME: branch2
+      CI_PROJECT_DIR: /repo
+      CI_JOB_NAME: jobA
+      SKIP_CI_PAGE_TO_FETCH_MAX: 1
+
+  rust-test-alpine:
+    image: alpine:3.17
+    volumes:
+      - ../../:/skip-ci-root:ro
+#    entrypoint:  ["/bin/sh", "-c"]
+    command: [ "/bin/sh", "-c" ,"\
+      echo oo && \
+      echo bb && \
+      apk add unzip && \
+      rm -rf /repo && \
+      mkdir /repo && \
+      cd /repo && \
+      unzip /skip-ci-root/test/artifact.zip && \
+      ls -al /repo/artifact"
+    ]
+    environment:
+      SKIP_CI_VERBOSE: true
+      CI_API_V4_URL: http://gitlab-fake-api/api/
+      SKIP_IF_TREE_OK_IN_PAST: root-2
+      API_READ_TOKEN: ___API_READ_TOKEN___
+      CI_PROJECT_ID: 123
+      CI_JOB_ID: 456
+      CI_COMMIT_REF_NAME: branch2
+      CI_PROJECT_DIR: /repo
+      CI_JOB_NAME: jobA
+      SKIP_CI_PAGE_TO_FETCH_MAX: 1
+
+  rust-test-ubuntu--tree-found-in-job :
+    image: ubuntu:22.04
+    volumes:
+      - ../../:/skip-ci-root:ro
+    command: [ "/bin/bash", "-c" ,"                                \
+      rm -rf /repo                                              && \
+      mkdir /repo                                               && \
+      cd /repo                                                  && \
+      tar -zxf /skip-ci-root/test/repo.tar.gz --directory /repo && \
+      ls -al /repo                                              && \
+      /skip-ci-root/skip-if-tree-ok-in-past                      ; \
+      echo exit code = $?                                       && \
+      echo                                                      && \
+      echo ls -al /repo :                                       && \
+      ls -al /repo                                              && \
+      echo                                                      && \
+      echo ls -al /repo/artifact :                              && \
+      ls -al /repo/artifact                                     && \
+      echo                                                      && \
+      echo ls -al /tmp :                                        && \
+      ls -al /tmp                                               && \
+      echo                                                      && \
+      echo ls -al /tmp/* :                                      && \
+      ls -al /tmp/*                                              ; \
+      echo                                                      && \
+      echo ci-skip content : $(cat /repo/ci-skip-123-456)       && \
+      [[ true = $(cat /repo/ci-skip-123-456) ]]
+      "
+    ]
+    environment:
+      SKIP_CI_VERBOSE: true
+      CI_API_V4_URL: http://gitlab-fake-api/api
+      SKIP_IF_TREE_OK_IN_PAST: root-1
+      API_READ_TOKEN: ___API_READ_TOKEN___
+      CI_PROJECT_ID: 123
+      CI_JOB_ID: 456
+      CI_COMMIT_REF_NAME: branch2
+      CI_PROJECT_DIR: /repo
+      CI_JOB_NAME: jobA
+      SKIP_CI_PAGE_TO_FETCH_MAX: 1
+      CI_JOB_TOKEN: ___CI_JOB_TOKEN___
+
+  rust-test-ubuntu--tree-not-found-in-job :
+    image: ubuntu:22.04
+    volumes:
+      - ../../:/skip-ci-root:ro
+    command: [ "/bin/bash", "-c" ,"                                \
+      rm -rf /repo                                              && \
+      mkdir /repo                                               && \
+      cd /repo                                                  && \
+      tar -zxf /skip-ci-root/test/repo.tar.gz --directory /repo && \
+      ls -al /repo                                              && \
+      /skip-ci-root/skip-if-tree-ok-in-past;                       \
+      echo exit code = $?                                       && \
+      echo                                                      && \
+      echo ls -al /repo :                                       && \
+      ls -al /repo                                              && \
+      echo                                                      && \
+      echo ls -al /tmp :                                        && \
+      ls -al /tmp                                               && \
+      echo                                                      && \
+      echo ls -al /tmp/* :                                      && \
+      ls -al /tmp/*                                              ; \
+      echo                                                      && \
+      echo ci-skip content : $(cat /repo/ci-skip-123-456)       && \
+      [[ false = $(cat /repo/ci-skip-123-456) ]]
+      "
+    ]
+    environment:
+      SKIP_CI_VERBOSE: true
+      CI_API_V4_URL: http://gitlab-fake-api/api/
+      SKIP_IF_TREE_OK_IN_PAST: root-2
+      API_READ_TOKEN: ___API_READ_TOKEN___
+      CI_PROJECT_ID: 123
+      CI_JOB_ID: 456
+      CI_COMMIT_REF_NAME: branch2
+      CI_PROJECT_DIR: /repo
+      CI_JOB_NAME: jobA
+      SKIP_CI_PAGE_TO_FETCH_MAX: 1
+      CI_JOB_TOKEN: ___CI_JOB_TOKEN___
