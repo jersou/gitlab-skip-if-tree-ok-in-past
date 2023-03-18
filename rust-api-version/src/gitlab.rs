@@ -39,7 +39,8 @@ pub async fn get_project_jobs(
     let url = format!(
         "{project_jobs_api_url}?scope=success&per_page=100&page={page_num}&private_token={private_token}",
     );
-    let client = hyper::Client::new();
+    let https = hyper_tls::HttpsConnector::new();
+    let client = hyper::Client::builder().build::<_, hyper::Body>(https);
     let response = client
         .get(url.parse().context("parse url error")?)
         .await

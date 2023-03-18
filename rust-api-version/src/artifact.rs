@@ -41,7 +41,8 @@ pub async fn extract_artifacts(config: &Config, job: &GitlabJob) -> anyhow::Resu
 async fn download_file(url: &str, file_path: &str) -> anyhow::Result<bool> {
     verbose!("download_file to {file_path}");
     let mut file = File::create(file_path).context("Error while creating downloaded file")?;
-    let client = hyper::Client::new();
+    let https = hyper_tls::HttpsConnector::new();
+    let client = hyper::Client::builder().build::<_, hyper::Body>(https);
     let mut response = client
         .get(url.parse().context("parse url error")?)
         .await

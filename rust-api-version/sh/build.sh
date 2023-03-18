@@ -16,9 +16,11 @@ cd "$dir_path/.."
 
 # rustup +nightly target add x86_64-unknown-linux-musl
 # rustup target add x86_64-unknown-linux-musl
-cargo +nightly build -Z build-std=std,panic_abort  --release --target x86_64-unknown-linux-musl -Z build-std-features=panic_immediate_abort
+cargo +nightly build -Z build-std=std,panic_abort  --release --target x86_64-unknown-linux-musl -Z build-std-features=panic_immediate_abort --features vendored
 cp target/x86_64-unknown-linux-musl/release/gitlab-skip-if-tree-ok-in-past-rust-api-version ./skip-if-tree-ok-in-past
 upx --best --lzma ./skip-if-tree-ok-in-past
+
+! ldd skip-if-tree-ok-in-past
 
 ##### cargo bloat ↓
 # to list crates/fn size : remove `strip = true` and :
