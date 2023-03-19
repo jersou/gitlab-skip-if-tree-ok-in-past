@@ -5,6 +5,7 @@ mod gitlab;
 mod help;
 mod log;
 mod process;
+mod trace;
 
 #[cfg(not(tarpaulin_include))]
 #[tokio::main(flavor = "current_thread")]

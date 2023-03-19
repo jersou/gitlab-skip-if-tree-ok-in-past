@@ -12,3 +12,4 @@ SKIP_CI_VERBOSE=true \
               -- --test-threads=1
 
 xdg-open target/tarpaulin-report.html
+

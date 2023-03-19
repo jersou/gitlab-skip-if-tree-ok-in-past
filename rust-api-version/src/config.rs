@@ -59,15 +59,8 @@ impl Display for Config {
             self.project_path,
             self.jobs_api_url,
             self.ci_skip_path,
-            if self.api_read_token.is_empty() {
-                "".to_string()
-            } else {
-                "*".repeat(40)
-            },
-            self.ci_job_token
-                .clone()
-                .map(|_| "*".repeat(40))
-                .unwrap_or_default(),
+            self.api_read_token,
+            self.ci_job_token.clone().unwrap_or_default(),
             self.page_to_fetch_max,
             self.commit_to_check_same_ref_max,
             self.commit_to_check_same_job_max,
@@ -75,9 +68,9 @@ impl Display for Config {
     }
 }
 
-// CI_PROJECT_DIR: The full path the repository is cloned to, and where the job runs from.
-// If the GitLab Runner CI_BUILDS_DIR parameter is set, this variable is set relative to the
-// value of builds_dir.
+/// CI_PROJECT_DIR: The full path the repository is cloned to, and where the job runs from.
+/// If the GitLab Runner CI_BUILDS_DIR parameter is set, this variable is set relative to the
+/// value of builds_dir.
 pub fn get_project_path(ci_builds_dir: &str, ci_project_dir: &str) -> anyhow::Result<String> {
     let project_path = if ci_project_dir.starts_with(ci_builds_dir) {
         String::from(ci_project_dir) + "/"
@@ -86,11 +79,7 @@ pub fn get_project_path(ci_builds_dir: &str, ci_project_dir: &str) -> anyhow::Re
             .parent()
             .context("no ci_builds_dir parent ?")?;
         let full_path = build_dir_parent.join(Path::new(&ci_project_dir[1..]));
-        full_path
-            .to_str()
-            .context("project path error ?")?
-            .to_string()
-            + "/"
+        full_path.to_str().unwrap_or_default().to_string() + "/"
     };
     verbose!("project_path={project_path}");
     Ok(project_path)
@@ -111,18 +100,20 @@ pub fn config_from_env() -> anyhow::Result<Config> {
     let page_to_fetch_max = env::var("SKIP_CI_PAGE_TO_FETCH_MAX")
         .map(|s| s.parse::<u32>().unwrap_or(DEFAULT_PAGE_TO_FETCH_MAX))
         .unwrap_or(DEFAULT_PAGE_TO_FETCH_MAX);
+
     let commit_to_check_same_ref_max = env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX")
         .map(|s| {
             s.parse::<u32>()
                 .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX)
         })
         .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX);
-    let commit_to_check_same_job_max = env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX")
-        .map(|s| {
-            s.parse::<u32>()
-                .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_JOB_MAX)
-        })
-        .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_JOB_MAX);
+
+    let commit_to_check_same_job_max = match env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX") {
+        Ok(s) => s
+            .parse::<u32>()
+            .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_JOB_MAX),
+        _ => DEFAULT_COMMIT_TO_CHECK_SAME_JOB_MAX,
+    };
 
     let config = Config {
         api_read_token: env::var("API_READ_TOKEN").context("API_READ_TOKEN is not defined")?,
@@ -144,6 +135,10 @@ pub fn config_from_env() -> anyhow::Result<Config> {
     verbose!("config = {config}");
     Ok(config)
 }
+
+///
+///
+///
 
 #[cfg(test)]
 mod tests {
@@ -427,7 +422,7 @@ mod tests {
             api_read_token: "__API_READ_TOKEN__".to_string(),
             ci_commit_ref_name: Ok("__CI_COMMIT_REF_NAME__".to_string()),
             ci_job_name: "".to_string(),
-            ci_job_token: Ok("".to_string()),
+            ci_job_token: Ok("__CI_JOB_TOKEN__".to_string()),
             verbose: false,
             files_to_check: "__files_to_check__".to_string(),
             project_path: "__project_path__".to_string(),
@@ -449,8 +444,8 @@ mod tests {
   project_path                 = __project_path__
   jobs_api_url                 = __jobs_api_url__
   ci_skip_path                 = __ci_skip_path__
-  api_read_token               = ****************************************
-  ci_job_token                 = ****************************************
+  api_read_token               = __API_READ_TOKEN__
+  ci_job_token                 = __CI_JOB_TOKEN__
   page_to_fetch_max            = 0
   commit_to_check_same_ref_max = 0
   commit_to_check_same_job_max = 0"###

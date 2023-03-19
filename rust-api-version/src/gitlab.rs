@@ -124,7 +124,7 @@ mod tests {
                 ),
             ),
         );
-        let url = server.url("/api/123/jobs/456").to_string();
+        let url = server.url_str("/api/123/jobs/456");
         let jobs = get_project_jobs(&url, 1, "__PRIVATE_TOKEN__")
             .await
             .unwrap();

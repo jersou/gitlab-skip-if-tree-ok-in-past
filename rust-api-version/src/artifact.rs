@@ -96,7 +96,7 @@ mod tests {
             Expectation::matching(request::method_path("GET", "/api/123/jobs/456/artifact"))
                 .respond_with(status_code(200).body("abc")),
         );
-        let url = server.url("/api/123/jobs/456/artifact").to_string();
+        let url = server.url_str("/api/123/jobs/456/artifact");
         let tmp_dir = TempDir::new("test_download_file").unwrap();
         let tmp_path = tmp_dir.into_path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
@@ -113,7 +113,7 @@ mod tests {
             Expectation::matching(request::method_path("GET", "/api/123/jobs/456/artifact"))
                 .respond_with(status_code(404).body("abc")),
         );
-        let url = server.url("/api/123/jobs/456/artifact").to_string();
+        let url = server.url_str("/api/123/jobs/456/artifact");
         let tmp_dir = TempDir::new("test_download_file").unwrap();
         let tmp_path = tmp_dir.into_path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
@@ -152,7 +152,7 @@ mod tests {
     fn prepare_tmpdir_and_server() -> (TempDir, Server, String, Config) {
         let tmp_dir = TempDir::new("test_download_file").unwrap();
         let server = Server::run();
-        let url = server.url("/api/123/jobs").to_string();
+        let url = server.url_str("/api/123/jobs");
         let config = Config {
             api_read_token: "".to_string(),
             ci_commit_ref_name: Ok("__CI_COMMIT_REF_NAME__".to_string()),

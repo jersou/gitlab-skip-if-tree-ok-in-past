@@ -3,6 +3,10 @@ use crate::config::Config;
 use crate::git::get_tree_of_paths;
 use crate::gitlab::{get_project_jobs, GitlabJob};
 use crate::log::{green, red, yellow};
+use crate::trace::{
+    get_trace_url, parse_oldest_ancestor_from_job_trace, SKIP_CI_DONE_KEY,
+    SKIP_CI_OLDEST_ANCESTOR_KEY,
+};
 use crate::verbose;
 use anyhow::Context;
 use git2::Repository;
@@ -33,10 +37,10 @@ async fn check_skip_is_done(path_str: &str) -> Option<bool> {
 }
 
 // write the result to the skip-ci file
-async fn write_skip_done(path_str: &str, result: &bool) -> anyhow::Result<()> {
+async fn write_skip_done(path_str: &str, result: bool) -> anyhow::Result<()> {
     verbose!("write {result} to skip-ci file {path_str}");
     let path = Path::new(path_str);
-    let result_str = if *result {
+    let result_str = if result {
         "true".as_bytes()
     } else {
         "false".as_bytes()
@@ -121,28 +125,64 @@ async fn find_last_job_ok(config: &Config) -> anyhow::Result<Option<GitlabJob>> 
     Ok(None)
 }
 
-async fn process(config: &Config) -> anyhow::Result<(bool, Option<GitlabJob>)> {
+#[derive(Debug)]
+pub struct ProcessResult {
+    pub skip_ci: bool,
+    pub found_job: Option<GitlabJob>,
+    pub oldest_ancestor: Option<String>,
+}
+
+async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
     // 1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
     let is_skip_done = check_skip_is_done(&config.ci_skip_path).await;
     // If file exists, exit
-    match is_skip_done {
-        Some(skip_res) => Ok((skip_res, None)),
+    let result = match is_skip_done {
+        Some(skip_ci) => ProcessResult {
+            skip_ci,
+            found_job: None,
+            oldest_ancestor: None,
+        },
         None => {
             // 3. Get last successful jobs of the project
             let job_ok = find_last_job_ok(config).await?;
+
             //     5.3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
             // 6. If no job found, write false in ci-skip file and exit with code > 0
 
             // extract job artifact
-            if let Some(job) = job_ok.clone() {
-                extract_artifacts(config, &job).await?;
-            }
+            let process_result: ProcessResult = match job_ok {
+                Some(job) => {
+                    extract_artifacts(config, &job).await?;
+                    let trace_url =
+                        get_trace_url(&config.jobs_api_url, job.id, &config.api_read_token);
+                    let oldest_ancestor =
+                        match parse_oldest_ancestor_from_job_trace(&trace_url).await {
+                            Ok(Some(url)) => url,
+                            _ => job.web_url.clone(),
+                        };
 
-            write_skip_done(&config.ci_skip_path, &job_ok.is_some()).await?;
+                    // Important to keep for the next job that will parse this trace
+                    println!("{SKIP_CI_OLDEST_ANCESTOR_KEY}={oldest_ancestor}");
+                    ProcessResult {
+                        skip_ci: true,
+                        found_job: Some(job),
+                        oldest_ancestor: Some(oldest_ancestor),
+                    }
+                }
+                None => ProcessResult {
+                    skip_ci: false,
+                    found_job: None,
+                    oldest_ancestor: None,
+                },
+            };
 
-            Ok((job_ok.is_some(), job_ok))
+            write_skip_done(&config.ci_skip_path, process_result.skip_ci).await?;
+
+            process_result
         }
-    }
+    };
+    println!("{}", SKIP_CI_DONE_KEY);
+    Ok(result)
 }
 
 pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i32 {
@@ -157,12 +197,24 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
                     red(&format!("❌ PROCESS ERROR : \n{e:#?}"));
                     2
                 }
-                Ok((true, None)) => 0,
-                Ok((true, Some(job))) => {
-                    green(&format!("✅ tree found in job {}", &job.web_url));
+                Ok(ProcessResult {
+                    skip_ci: true,
+                    found_job: None,
+                    ..
+                }) => 0,
+                Ok(ProcessResult {
+                    skip_ci: true,
+                    found_job: Some(job),
+                    oldest_ancestor,
+                }) => {
+                    green(&format!("✅ tree found in job {}  ", &job.web_url));
+                    green(&format!(
+                        "✅ the oldest ancestor found : {}  ",
+                        oldest_ancestor.unwrap_or_default()
+                    ));
                     0
                 }
-                Ok((false, _)) => {
+                Ok(ProcessResult { skip_ci: false, .. }) => {
                     yellow("❌ tree not found in last jobs of the project");
                     1
                 }
@@ -192,12 +244,14 @@ mod tests {
     };
     use anyhow::Error;
     use git2::{Oid, Repository};
-    use httptest::matchers::request;
+    use httptest::matchers::*;
     use httptest::responders::status_code;
-    use httptest::{Expectation, Server};
+    use httptest::{all_of, Expectation, Server};
+    use std::env::VarError;
     use std::fs;
     use std::fs::File;
     use std::path::Path;
+    use std::string::String;
     use tempdir::TempDir;
 
     #[tokio::test]
@@ -226,20 +280,20 @@ mod tests {
     async fn test_write_skip_done() {
         let tmp_dir = TempDir::new("test_write_skip_done").unwrap();
         let path = tmp_dir.path().join("skip-ci-done-ok");
-        write_skip_done(&path.to_str().unwrap(), &true)
+        write_skip_done(&path.to_str().unwrap(), true)
             .await
             .unwrap();
         assert!(path.try_exists().unwrap());
         let content = fs::read_to_string(path).unwrap();
         assert_eq!(content, "true");
         let path = tmp_dir.path().join("skip-ci-done-ko");
-        write_skip_done(path.to_str().unwrap(), &false)
+        write_skip_done(path.to_str().unwrap(), false)
             .await
             .unwrap();
         assert!(path.try_exists().unwrap());
         let content = fs::read_to_string(path).unwrap();
         assert_eq!(content, "false");
-        let err = write_skip_done("/zzzz/zzzz/zzzzz", &false)
+        let err = write_skip_done("/zzzz/zzzz/zzzzz", false)
             .await
             .err()
             .map(|e| format!("{e:#}"))
@@ -316,12 +370,15 @@ mod tests {
         (tmp_dir, repo)
     }
 
+    // https://gitlab.localhost/skip/skip-rs/-/jobs/12345678
+
     fn add_jobs_expect(server: &Server) -> String {
         server.expect(
             Expectation::matching(request::method_path("GET", "/api/123/jobs"))
                 .times(1..)
-                .respond_with(status_code(200).body(
-                    r###"[
+                .respond_with(
+                    status_code(200).body(
+                        r###"[
   {
     "artifacts_expire_at": null,
     "commit": {
@@ -342,33 +399,118 @@ mod tests {
     "name": "jobA",
     "ref": "branch1",
     "status": "success",
-    "web_url": "https://gitlab.localhost/skip/skip-rs/-/jobs/12345678"
+    "web_url": ""###
+                            .to_owned()
+                            + server.url_str("/skip/skip-rs/-/jobs/12345678").as_str()
+                            + r###""
   }
 ]"###,
-                )),
+                    ),
+                ),
         );
-        server.url("/api/123/jobs").to_string()
+        server.url_str("/api/123/jobs")
     }
 
     #[tokio::test]
     async fn test_process_ok_12345678() {
         let (tmp_dir, repo) = prepare_tmp_repo();
         let server = Server::run();
+        let raw = fs::read_to_string(Path::new(
+            "test/integration/api/projects/123/jobs/12345679/raw",
+        ))
+        .unwrap();
+        server.expect(
+            Expectation::matching(all_of!(
+                request::method_path("GET", "/api/123/jobs/12345678/trace",),
+                request::query(url_decoded(contains(("private_token", "aaa"))))
+            ))
+            .respond_with(status_code(200).body(raw)),
+        );
         let url = add_jobs_expect(&server);
-
         // commit04
         repo.set_head_detached(Oid::from_str("5e694dadd2979a2680c98c88a2f98df9787947d2").unwrap())
             .unwrap();
-
         let config = create_config_ok(&tmp_dir, &url);
-        let res = process(&config).await;
-        assert_eq!(res.unwrap().1.unwrap().id, 12345678);
+        let res = process(&config).await.unwrap();
+        assert_eq!(res.found_job.unwrap().id, 12345678);
+        assert_eq!(
+            res.oldest_ancestor.unwrap(),
+            "http://gitlab-fake-api/api/projects/123/jobs/11"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_ok_12345678_no_trace() {
+        let (tmp_dir, repo) = prepare_tmp_repo();
+        let server = Server::run();
+        server.expect(
+            Expectation::matching(all_of!(
+                request::method_path("GET", "/api/123/jobs/12345678/trace",),
+                request::query(url_decoded(contains(("private_token", "aaa"))))
+            ))
+            .respond_with(status_code(200).body("")),
+        );
+        let url = add_jobs_expect(&server);
+        // commit04
+        repo.set_head_detached(Oid::from_str("5e694dadd2979a2680c98c88a2f98df9787947d2").unwrap())
+            .unwrap();
+        let config = create_config_ok(&tmp_dir, &url);
+        let res = process(&config).await.unwrap();
+        let job = res.found_job.unwrap();
+        assert_eq!(job.id, 12345678);
+        assert_eq!(res.oldest_ancestor.unwrap(), job.web_url);
+    }
+
+    #[tokio::test]
+    async fn test_process_ok_12345678_no_job_token() {
+        let (tmp_dir, repo) = prepare_tmp_repo();
+        let server = Server::run();
+        let url = add_jobs_expect(&server);
+        server.expect(
+            Expectation::matching(all_of!(
+                request::method_path("GET", "/api/123/jobs/12345678/trace",),
+                request::query(url_decoded(contains(("private_token", "aaa"))))
+            ))
+            .respond_with(status_code(200).body("")),
+        );
+        // commit04
+        repo.set_head_detached(Oid::from_str("5e694dadd2979a2680c98c88a2f98df9787947d2").unwrap())
+            .unwrap();
+        let config = Config {
+            api_read_token: "aaa".to_string(),
+            ci_commit_ref_name: Ok("branch1".to_string()),
+            ci_job_name: "jobA".to_string(),
+            ci_job_token: Err(VarError::NotPresent),
+            verbose: false,
+            files_to_check: "root-1 Service-A/file-A1".to_string(),
+            project_path: tmp_dir.path().to_str().unwrap().to_string(),
+            jobs_api_url: url.clone(),
+            ci_skip_path: tmp_dir.path().join("ci-skip").to_str().unwrap().to_string(),
+            page_to_fetch_max: 2,
+            commit_to_check_same_ref_max: 2,
+            commit_to_check_same_job_max: 2,
+        };
+        let res = process(&config).await.unwrap();
+        let job = res.found_job.unwrap();
+        assert_eq!(job.id, 12345678);
+        assert_eq!(res.oldest_ancestor.unwrap(), job.web_url);
     }
 
     #[tokio::test]
     async fn test_process_with_exit_code_ok_12345678() {
         let (tmp_dir, repo) = prepare_tmp_repo();
         let server = Server::run();
+        let raw = fs::read_to_string(Path::new(
+            "test/integration/api/projects/123/jobs/12345679/raw",
+        ))
+        .unwrap();
+        server.expect(
+            Expectation::matching(all_of!(
+                request::method_path("GET", "/api/123/jobs/12345678/trace",),
+                request::query(url_decoded(contains(("private_token", "aaa"))))
+            ))
+            .respond_with(status_code(200).body(raw)),
+        );
         let url = add_jobs_expect(&server);
 
         // commit04
@@ -402,7 +544,7 @@ mod tests {
             commit_to_check_same_job_max: 2,
         };
         let res = process(&config).await;
-        assert!(res.unwrap().1.is_none());
+        assert!(res.unwrap().found_job.is_none());
     }
 
     #[tokio::test]
@@ -424,9 +566,9 @@ mod tests {
             commit_to_check_same_ref_max: 0,
             commit_to_check_same_job_max: 1,
         };
-        let (is_found, job_found) = process(&config).await.unwrap();
-        assert!(job_found.is_none());
-        assert!(!is_found);
+        let res = process(&config).await.unwrap();
+        assert!(res.found_job.is_none());
+        assert!(!res.skip_ci);
     }
 
     #[tokio::test]
@@ -448,9 +590,9 @@ mod tests {
             commit_to_check_same_ref_max: 10,
             commit_to_check_same_job_max: 0,
         };
-        let (is_found, job_found) = process(&config).await.unwrap();
-        assert!(job_found.is_none());
-        assert!(!is_found);
+        let res = process(&config).await.unwrap();
+        assert!(res.found_job.is_none());
+        assert!(!res.skip_ci);
     }
 
     #[tokio::test]
@@ -489,9 +631,9 @@ mod tests {
         let config = create_config_no_url(&tmp_dir);
         let path = tmp_dir.path().join("skip-ci");
         fs::write(&path, "true").unwrap();
-        let (is_found, job_found) = process(&config).await.unwrap();
-        assert!(job_found.is_none());
-        assert!(is_found);
+        let res = process(&config).await.unwrap();
+        assert!(res.found_job.is_none());
+        assert!(res.skip_ci);
     }
     #[tokio::test]
     async fn test_process_none_skip_ci_err() {
@@ -525,9 +667,9 @@ mod tests {
         let config = create_config_no_url(&tmp_dir);
         let path = tmp_dir.path().join("skip-ci");
         fs::write(&path, "false").unwrap();
-        let (is_found, job_found) = process(&config).await.unwrap();
-        assert!(job_found.is_none());
-        assert!(!is_found);
+        let res = process(&config).await.unwrap();
+        assert!(res.found_job.is_none());
+        assert!(!res.skip_ci);
         let res = process_with_exit_code(Ok(config)).await;
         assert_eq!(res, 1);
     }

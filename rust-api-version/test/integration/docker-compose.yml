@@ -13,11 +13,12 @@ services:
   rust-test-scratch-ok:
     image: scratch-image
     build:
-     context: ..
-     dockerfile: integration/scratch-image/Dockerfile
+      context: ..
+      dockerfile: integration/scratch-image/Dockerfile
     volumes:
       - ../../skip-if-tree-ok-in-past:/skip-if-tree-ok-in-past:ro
-    entrypoint: ["/skip-if-tree-ok-in-past"]
+      - /tmp
+    entrypoint: [ "/skip-if-tree-ok-in-past" ]
     working_dir: /repo
     environment:
       SKIP_CI_VERBOSE: true
@@ -30,15 +31,16 @@ services:
       CI_PROJECT_DIR: /repo
       CI_JOB_NAME: jobA
       SKIP_CI_PAGE_TO_FETCH_MAX: 1
+      CI_JOB_TOKEN: __CI_JOB_TOKEN__
 
   rust-test-scratch-ko:
     image: scratch-image
     build:
-     context: ..
-     dockerfile: integration/scratch-image/Dockerfile
+      context: ..
+      dockerfile: integration/scratch-image/Dockerfile
     volumes:
       - ../../skip-if-tree-ok-in-past:/skip-if-tree-ok-in-past:ro
-    entrypoint: ["/skip-if-tree-ok-in-past"]
+    entrypoint: [ "/skip-if-tree-ok-in-past" ]
     working_dir: /repo
     environment:
       SKIP_CI_VERBOSE: true
@@ -52,34 +54,7 @@ services:
       CI_JOB_NAME: jobA
       SKIP_CI_PAGE_TO_FETCH_MAX: 1
 
-  rust-test-alpine:
-    image: alpine:3.17
-    volumes:
-      - ../../:/skip-ci-root:ro
-#    entrypoint:  ["/bin/sh", "-c"]
-    command: [ "/bin/sh", "-c" ,"\
-      echo oo && \
-      echo bb && \
-      apk add unzip && \
-      rm -rf /repo && \
-      mkdir /repo && \
-      cd /repo && \
-      unzip /skip-ci-root/test/artifact.zip && \
-      ls -al /repo/artifact"
-    ]
-    environment:
-      SKIP_CI_VERBOSE: true
-      CI_API_V4_URL: http://gitlab-fake-api/api/
-      SKIP_IF_TREE_OK_IN_PAST: root-2
-      API_READ_TOKEN: ___API_READ_TOKEN___
-      CI_PROJECT_ID: 123
-      CI_JOB_ID: 456
-      CI_COMMIT_REF_NAME: branch2
-      CI_PROJECT_DIR: /repo
-      CI_JOB_NAME: jobA
-      SKIP_CI_PAGE_TO_FETCH_MAX: 1
-
-  rust-test-ubuntu--tree-found-in-job :
+  rust-test-ubuntu--tree-found-in-job:
     image: ubuntu:22.04
     volumes:
       - ../../:/skip-ci-root:ro
@@ -121,7 +96,7 @@ services:
       SKIP_CI_PAGE_TO_FETCH_MAX: 1
       CI_JOB_TOKEN: ___CI_JOB_TOKEN___
 
-  rust-test-ubuntu--tree-not-found-in-job :
+  rust-test-ubuntu--tree-not-found-in-job:
     image: ubuntu:22.04
     volumes:
       - ../../:/skip-ci-root:ro

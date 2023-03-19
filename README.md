@@ -3,15 +3,28 @@
 **To skip the running of a job if another job has already succeeded in the past
 with the same versions of the files on which the job depends.**
 
+This project is useful on monorepo :
+it permits to run the jobs of services that have changed but to skip the jobs of
+the services that have already been tested in the past in the current state of
+their files.
+
+It is complementary to the Gitlab feature
+[rules:changes:compare_to](https://docs.gitlab.com/ee/ci/yaml/index.html#ruleschangescompare_to) :
+for long running branch, the files can be different from the compare_to
+reference but have been tested since the fork.
+
 This project contains 5 implementations of the issue described bellow :
 
 * a bash implementation, that require : bash, curl, git, unzip, fx
 * a NodeJS implementation, that require : git, nodejs, unzip
 * a Deno implementation, that require : git, nodejs, unzip
-* a Go implementation, that require : nothing except the 1.9Mo binary file `skip-if-tree-ok-in-past`
-* **a Rust implementation**, that require : nothing except the 1.4Mo binary file `skip-if-tree-ok-in-past`
+* a Go implementation, that require : nothing except the 1.9Mo binary
+  file `skip-if-tree-ok-in-past`
+* **a Rust implementation**, that require : nothing except the 1.4Mo binary
+  file `skip-if-tree-ok-in-past`
 
-**The recommended version is the Rust which has no dependency and is 95% covered by tests.**
+**The recommended version is the Rust which has no dependency and is 100%
+covered by tests.**
 
 → see [rust-api-version/README.md](rust-api-version/README.md)
 
@@ -183,6 +196,7 @@ Or the job could be skipped like the "only:changes" option.
 
 ### Links / references
 
-- https://gitlab.com/jersou/gitlab-tree-ok-cache
+- https://gitlab.com/gitlab-org/gitlab/-/issues/350212
 - https://gitlab.com/jersou/gitlab-skip-if-tree-ok-in-past
 - https://github.com/jersou/gitlab-skip-if-tree-ok-in-past
+- https://gitlab.com/jersou/gitlab-tree-ok-cache

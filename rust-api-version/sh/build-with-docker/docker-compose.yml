@@ -12,6 +12,6 @@ services:
       - /home/user
     user: $UID:$GID
     working_dir: /src
-    command: ["/bin/sh", "-c", "echo '\e[1;41;39m  Think about redoing : docker compose build !\e[0m' && cp /src/skip-if-tree-ok-in-past /out/skip-if-tree-ok-in-past"]
+    command: [ "/bin/sh", "-c", "echo '\e[1;41;39m  Think about redoing : docker compose build !\e[0m' && cp /src/skip-if-tree-ok-in-past /out/skip-if-tree-ok-in-past" ]
     environment:
       HOME: /home/user
