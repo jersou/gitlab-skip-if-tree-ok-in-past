@@ -69,7 +69,7 @@ curl --silent --fail "$CI_API_V4_URL/projects/${CI_PROJECT_ID}/jobs?scope=succes
 if test -f $ci_skip_path; then
   exit 0
 else
-  echo -e "\e[1;43;30m    ❌ tree not found in last 1000 success jobs of the project    \e[0m"
+  echo -e "\e[1;43;30m    ❌ tree not found in last success jobs of the project    \e[0m"
   echo false >$ci_skip_path
   exit 4
 fi

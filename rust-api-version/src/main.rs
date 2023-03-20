@@ -1,10 +1,12 @@
 mod artifact;
 mod config;
+mod find_last_job_ok;
 mod git;
-mod gitlab;
 mod help;
+mod jobs;
 mod log;
 mod process;
+mod skip_ci_file;
 mod trace;
 
 #[cfg(not(tarpaulin_include))]

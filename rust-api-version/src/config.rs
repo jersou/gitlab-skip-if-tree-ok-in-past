@@ -49,10 +49,7 @@ impl Display for Config {
   commit_to_check_same_ref_max = {}
   commit_to_check_same_job_max = {}"###,
             self.project_path.as_str(),
-            self.ci_commit_ref_name
-                .clone()
-                .unwrap_or_else(|_| "".to_string())
-                .as_str(),
+            self.ci_commit_ref_name.clone().unwrap_or_default(),
             self.ci_job_name,
             self.verbose,
             self.files_to_check,
@@ -87,26 +84,27 @@ pub fn get_project_path(ci_builds_dir: &str, ci_project_dir: &str) -> anyhow::Re
 
 pub fn config_from_env() -> anyhow::Result<Config> {
     let ci_api_v4_url = env::var("CI_API_V4_URL").context("CI_API_V4_URL is not defined")?;
-    let ci_builds_dir = env::var("CI_BUILDS_DIR").unwrap_or_else(|_| String::from(""));
+    let ci_builds_dir = env::var("CI_BUILDS_DIR").unwrap_or_default();
     let ci_project_dir = env::var("CI_PROJECT_DIR").context("CI_PROJECT_DIR is not defined")?;
     let ci_project_id = env::var("CI_PROJECT_ID").context("CI_PROJECT_ID is not defined")?;
     let ci_job_id = env::var("CI_JOB_ID").context("CI_JOB_ID is not defined")?;
 
     let project_path =
         get_project_path(&ci_builds_dir, &ci_project_dir).context("get_project_path error:")?;
-    let project_jobs_api_url = format!("{ci_api_v4_url}/projects/{ci_project_id}/jobs");
+    let jobs_api_url = format!("{ci_api_v4_url}/projects/{ci_project_id}/jobs");
     let ci_skip_path = format!("{project_path}ci-skip-{ci_project_id}-{ci_job_id}");
 
-    let page_to_fetch_max = env::var("SKIP_CI_PAGE_TO_FETCH_MAX")
-        .map(|s| s.parse::<u32>().unwrap_or(DEFAULT_PAGE_TO_FETCH_MAX))
-        .unwrap_or(DEFAULT_PAGE_TO_FETCH_MAX);
+    let page_to_fetch_max = match env::var("SKIP_CI_PAGE_TO_FETCH_MAX") {
+        Ok(s) => s.parse::<u32>().unwrap_or(DEFAULT_PAGE_TO_FETCH_MAX),
+        _ => DEFAULT_PAGE_TO_FETCH_MAX,
+    };
 
-    let commit_to_check_same_ref_max = env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX")
-        .map(|s| {
-            s.parse::<u32>()
-                .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX)
-        })
-        .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX);
+    let commit_to_check_same_ref_max = match env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX") {
+        Ok(s) => s
+            .parse::<u32>()
+            .unwrap_or(DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX),
+        _ => DEFAULT_COMMIT_TO_CHECK_SAME_REF_MAX,
+    };
 
     let commit_to_check_same_job_max = match env::var("SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX") {
         Ok(s) => s
@@ -126,7 +124,7 @@ pub fn config_from_env() -> anyhow::Result<Config> {
         files_to_check: env::var("SKIP_IF_TREE_OK_IN_PAST")
             .context("SKIP_IF_TREE_OK_IN_PAST is not defined")?,
         project_path,
-        jobs_api_url: project_jobs_api_url,
+        jobs_api_url,
         ci_skip_path,
         page_to_fetch_max,
         commit_to_check_same_ref_max,

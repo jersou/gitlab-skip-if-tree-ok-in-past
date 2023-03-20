@@ -4,7 +4,7 @@
 // Implementation summary :
 //     1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
 //     2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
-//     3. Get last 1000 successful jobs of the project
+//     3. Get last successful jobs of the project
 //     4. Filter jobs : keep current job only
 //     5. For each job :
 //         1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
@@ -40,7 +40,7 @@ import {
   bgRed,
   bgYellow,
 } from "https://deno.land/std@0.130.0/fmt/colors.ts";
-import { exists } from "https://deno.land/std@0.130.0/fs/exists.ts";
+import {exists} from "https://deno.land/std@0.130.0/fs/exists.ts";
 
 const pageToFetchMax = 5;
 const commitToCheckSameRefMax = 2;
@@ -129,7 +129,7 @@ async function extractArtifacts(job: Job) {
   if (job.artifacts_expire_at) {
     verbose(`Extract artifacts of job : ${job.id}`);
     const hasUnzipCmd =
-      (await Deno.run({ cmd: ["unzip", "-h"] }).status()).success;
+      (await Deno.run({cmd: ["unzip", "-h"]}).status()).success;
     if (!hasUnzipCmd) {
       red("unzip not found, skip artifacts dl/extract.");
       return;
@@ -143,7 +143,7 @@ async function extractArtifacts(job: Job) {
       }/jobs/${job.id}/artifacts?job_token=${Deno.env.get("CI_JOB_TOKEN")}`,
     );
     console.log(`unzip artifacts.zip`);
-    const process = await Deno.run({ cmd: ["unzip", artifactsPath] });
+    const process = await Deno.run({cmd: ["unzip", artifactsPath]});
     await Deno.remove(artifactsPath);
     if (!(await process.status()).success) {
       red("artifacts not found, expired ? → Don't skip");
@@ -155,7 +155,7 @@ async function extractArtifacts(job: Job) {
 
 async function exitNotFound() {
   await Deno.writeTextFile(ciSkipPath, "false");
-  yellow("❌ tree not found in last 1000 success jobs of the project");
+  yellow("❌ tree not found in last success jobs of the project");
   Deno.exit(4);
 }
 
@@ -163,8 +163,8 @@ async function main() {
   const currentTree = getTree("HEAD");
   verbose(
     "------------------------------ Current tree : ----------------------------------\n" +
-      currentTree +
-      "--------------------------------------------------------------------------------",
+    currentTree +
+    "--------------------------------------------------------------------------------",
   );
 
   let commitCheckedSameRef = 0;
@@ -184,14 +184,14 @@ async function main() {
       if (job.name === Deno.env.get("CI_JOB_NAME")) {
         verbose(
           `process job with same name, jobChecked=${jobChecked},` +
-            ` commitCheckedSameJob=${commitCheckedSameJob}`,
+          ` commitCheckedSameJob=${commitCheckedSameJob}`,
         );
         try {
           const tree = getTree(job.commit.id);
           verbose(
             "------------------------------     tree :     ----------------------------------\n" +
-              tree +
-              "--------------------------------------------------------------------------------",
+            tree +
+            "--------------------------------------------------------------------------------",
           );
           if (currentTree === tree) {
             await extractArtifacts(job);

@@ -186,7 +186,7 @@ Or the job could be skipped like the "only:changes" option.
 1. Check if the process has already been completed : check file ci-skip file. If
    file found, exit, else :
 2. Get the SHA-1 of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
-3. Get last 1000 successful jobs of the project
+3. Get last successful jobs of the project
 4. Filter jobs : keep current job only
 5. For each job :
     1. Get the SHA-1 of the tree "$SKIP_IF_TREE_OK_IN_PAST"

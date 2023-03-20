@@ -4,7 +4,7 @@
 // Implementation summary :
 //     1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
 //     2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
-//     3. Get last 1000 successful jobs of the project
+//     3. Get last successful jobs of the project
 //     4. Filter jobs : keep current job only
 //     5. For each job :
 //         1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
@@ -35,7 +35,7 @@
 //     - ./skip.js || service-A/test3.sh
 
 const fs = require("fs");
-const { spawn, execFileSync } = require("child_process");
+const {spawn, execFileSync} = require("child_process");
 const http = require("http");
 const https = require("https");
 const crypto = require("crypto");
@@ -52,194 +52,195 @@ const green = (msg) => color("1;42;30", msg);
 const ciBuildsDir = process.env.CI_BUILDS_DIR;
 const ciProjectDir = process.env.CI_PROJECT_DIR;
 const projectPath = ciProjectDir.startsWith(ciBuildsDir)
-  ? ciProjectDir
-  : ciBuildsDir + ciProjectDir.match(/(^\/[^\/]+)(.*)/)[2]; // remove first part of path
+    ? ciProjectDir
+    : ciBuildsDir + ciProjectDir.match(/(^\/[^\/]+)(.*)/)[2]; // remove first part of path
 const ciSkipPath = `${projectPath}/ci-skip-${process.env.CI_PROJECT_ID}-${process.env.CI_JOB_ID}`;
 const isVerbose = process.env.SKIP_CI_VERBOSE === "true";
 const verbose = (msg) => isVerbose && console.log(msg);
 
 if (process.env.SKIP_SKIP_CI === "true") {
-  yellow("⚠️ The SKIP_SKIP_CI === true → skip the check");
-  process.exit(1);
+    yellow("⚠️ The SKIP_SKIP_CI === true → skip the check");
+    process.exit(1);
 }
 
 if (!process.env.SKIP_IF_TREE_OK_IN_PAST) {
-  red(
-    "⚠️ The SKIP_IF_TREE_OK_IN_PAST variable is empty, set the list of paths to check"
-  );
-  process.exit(1);
+    red(
+        "⚠️ The SKIP_IF_TREE_OK_IN_PAST variable is empty, set the list of paths to check"
+    );
+    process.exit(1);
 }
 if (!process.env.API_READ_TOKEN) {
-  red("⚠️ The API_READ_TOKEN variable is empty !");
-  process.exit(1);
+    red("⚠️ The API_READ_TOKEN variable is empty !");
+    process.exit(1);
 }
 
 if (fs.existsSync(ciSkipPath)) {
-  const content = fs.readFileSync(ciSkipPath, "utf8").trim();
-  verbose(`ci-skip file exists, content=${content}`);
-  process.exit(content === "true" ? 0 : 3);
+    const content = fs.readFileSync(ciSkipPath, "utf8").trim();
+    verbose(`ci-skip file exists, content=${content}`);
+    process.exit(content === "true" ? 0 : 3);
 }
 
 function getTree(commit) {
-  return execFileSync(
-    "git",
-    [
-      "ls-tree",
-      commit,
-      "--",
-      ...process.env.SKIP_IF_TREE_OK_IN_PAST.split(" "),
-    ],
-    { stdio: ["pipe", "pipe", null] }
-  ).toString();
+    return execFileSync(
+        "git",
+        [
+            "ls-tree",
+            commit,
+            "--",
+            ...process.env.SKIP_IF_TREE_OK_IN_PAST.split(" "),
+        ],
+        {stdio: ["pipe", "pipe", null]}
+    ).toString();
 }
 
 function fetchJson(url) {
-  return new Promise((resolve, reject) => {
-    let client = url.match(/^https/) ? https : http;
-    client
-      .get(url, (resp) => {
-        if (resp.statusCode !== 200) {
-          reject(`Status Code: ${resp.statusCode} !`);
-        }
-        let data = "";
-        resp.on("data", (chunk) => (data += chunk));
-        resp.on("end", () => resolve(JSON.parse(data)));
-      })
-      .on("error", (err) => reject(err));
-  });
+    return new Promise((resolve, reject) => {
+        let client = url.match(/^https/) ? https : http;
+        client
+            .get(url, (resp) => {
+                if (resp.statusCode !== 200) {
+                    reject(`Status Code: ${resp.statusCode} !`);
+                }
+                let data = "";
+                resp.on("data", (chunk) => (data += chunk));
+                resp.on("end", () => resolve(JSON.parse(data)));
+            })
+            .on("error", (err) => reject(err));
+    });
 }
 
 function downloadFile(path, url) {
-  return new Promise((resolve, reject) => {
-    verbose(`DownloadFile file`);
-    const file = fs.createWriteStream(path);
-    let client = url.match(/^https/) ? https : http;
-    client
-      .get(url, (res) => {
-        if (res.statusCode === 302 && res.headers.location) {
-          verbose(`→ 302 follow the redirection`);
-          const location = res.headers.location;
-          downloadFile(path, location).then(resolve);
-        } else if (res.statusCode !== 200) {
-          console.error(res);
-          reject(`Status Code: ${res.statusCode} !`);
-        } else {
-          res.pipe(file);
-          res.on("end", () => resolve());
-        }
-      })
-      .on("error", (err) => reject(err));
-  });
+    return new Promise((resolve, reject) => {
+        verbose(`DownloadFile file`);
+        const file = fs.createWriteStream(path);
+        let client = url.match(/^https/) ? https : http;
+        client
+            .get(url, (res) => {
+                if (res.statusCode === 302 && res.headers.location) {
+                    verbose(`→ 302 follow the redirection`);
+                    const location = res.headers.location;
+                    downloadFile(path, location).then(resolve);
+                } else if (res.statusCode !== 200) {
+                    console.error(res);
+                    reject(`Status Code: ${res.statusCode} !`);
+                } else {
+                    res.pipe(file);
+                    res.on("end", () => resolve());
+                }
+            })
+            .on("error", (err) => reject(err));
+    });
 }
 
 async function extractArtifacts(job) {
-  console.log(`job ${job.id} artifacts_expire_at: ${job.artifacts_expire_at}`);
-  if (job.artifacts_expire_at) {
-    verbose(`Extract artifacts of job : ${job.Id}`);
-    try {
-      execFileSync("unzip", ["-h"]);
-    } catch (error) {
-      red("unzip not found, skip artifacts dl/extract.");
-      return;
+    console.log(`job ${job.id} artifacts_expire_at: ${job.artifacts_expire_at}`);
+    if (job.artifacts_expire_at) {
+        verbose(`Extract artifacts of job : ${job.Id}`);
+        try {
+            execFileSync("unzip", ["-h"]);
+        } catch (error) {
+            red("unzip not found, skip artifacts dl/extract.");
+            return;
+        }
+        try {
+            const artifactsPath = "artifacts.zip";
+            console.log(`download artifacts.zip`);
+            await downloadFile(
+                artifactsPath,
+                `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/jobs/${job.id}/artifacts?job_token=${process.env.CI_JOB_TOKEN}`
+            );
+            console.log(`unzip artifacts.zip`);
+            execFileSync("unzip", [artifactsPath]);
+            fs.unlinkSync(artifactsPath);
+        } catch (error) {
+            console.error(error);
+            red("artifacts not found, expired ? → Don't skip");
+            fs.writeFileSync(ciSkipPath, "false");
+            process.exit(5);
+        }
     }
-    try {
-      const artifactsPath = "artifacts.zip";
-      console.log(`download artifacts.zip`);
-      await downloadFile(
-        artifactsPath,
-        `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/jobs/${job.id}/artifacts?job_token=${process.env.CI_JOB_TOKEN}`
-      );
-      console.log(`unzip artifacts.zip`);
-      execFileSync("unzip", [artifactsPath]);
-      fs.unlinkSync(artifactsPath);
-    } catch (error) {
-      console.error(error);
-      red("artifacts not found, expired ? → Don't skip");
-      fs.writeFileSync(ciSkipPath, "false");
-      process.exit(5);
-    }
-  }
 }
 
 function exitNotFound() {
-  fs.writeFileSync(ciSkipPath, "false");
-  yellow("❌ tree not found in last 1000 success jobs of the project");
-  process.exit(4);
+    fs.writeFileSync(ciSkipPath, "false");
+    yellow("❌ tree not found in last success jobs of the project");
+    process.exit(4);
 }
 
- function checkTreeExists() {
-  const paths  = process.env.SKIP_IF_TREE_OK_IN_PAST.split(" ")
-  for (const path of paths) {
-    if(!fs.existsSync(path)){
-      red(`❌ SKIP_IF_TREE_OK_IN_PAST path "${path}" not found !`);
-      process.exit(6);
+function checkTreeExists() {
+    const paths = process.env.SKIP_IF_TREE_OK_IN_PAST.split(" ")
+    for (const path of paths) {
+        if (!fs.existsSync(path)) {
+            red(`❌ SKIP_IF_TREE_OK_IN_PAST path "${path}" not found !`);
+            process.exit(6);
+        }
     }
-  }
 }
 
 async function main() {
-  checkTreeExists()
-  const currentTree = getTree("HEAD");
-  verbose(
-    "------------------------------ Current tree : ----------------------------------\n" +
-      currentTree +
-      "--------------------------------------------------------------------------------"
-  );
-
-  let commitCheckedSameRef = 0;
-  let commitCheckedSameJob = 0;
-  let jobChecked = 0;
-  const ciCommitRefName = process.env.CI_COMMIT_REF_NAME;
-
-  for (let page = 0; page < pageToFetchMax; page++) {
-    const projectJobs = await fetchJson(
-      `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/jobs?scope=success&per_page=1000&page=&private_token=${process.env.API_READ_TOKEN}`
+    checkTreeExists()
+    const currentTree = getTree("HEAD");
+    verbose(
+        "------------------------------ Current tree : ----------------------------------\n" +
+        currentTree +
+        "--------------------------------------------------------------------------------"
     );
-    for (const job of projectJobs) {
-      if (job.name === process.env.CI_JOB_NAME) {
-        verbose(
-          `process job with same name, jobChecked=${jobChecked},` +
-            ` commitCheckedSameJob=${commitCheckedSameJob}`
+
+    let commitCheckedSameRef = 0;
+    let commitCheckedSameJob = 0;
+    let jobChecked = 0;
+    const ciCommitRefName = process.env.CI_COMMIT_REF_NAME;
+
+    for (let page = 0; page < pageToFetchMax; page++) {
+        const projectJobs = await fetchJson(
+            `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/jobs?scope=success&per_page=1000&page=&private_token=${process.env.API_READ_TOKEN}`
         );
-        try {
-          const tree = getTree(job.commit.id);
-          verbose(
-            "------------------------------     tree :     ----------------------------------\n" +
-              tree +
-              "--------------------------------------------------------------------------------"
-          );
-          if (currentTree === tree) {
-            await extractArtifacts(job);
-            fs.writeFileSync(ciSkipPath, "true");
-            green(`✅ tree found in job ${job.web_url}`);
-            process.exit(0);
-          }
-          if (job.ref === ciCommitRefName) {
-            commitCheckedSameRef++;
-            verbose(`The job have the same ref name (${commitCheckedSameRef})`);
-          }
-          commitCheckedSameJob++;
-        } catch (_) {}
-        jobChecked++;
-        if (
-          jobChecked >= jobToCheckMax ||
-          commitCheckedSameJob >= commitToCheckSameJobMax ||
-          commitCheckedSameRef >= commitToCheckSameRefMax
-        ) {
-          verbose("[exit not found] : ");
-          verbose(`jobChecked : ${jobChecked} /${jobToCheckMax} `);
-          verbose(
-            `commitCheckedSameJob : ${commitCheckedSameJob} /${commitToCheckSameJobMax} `
-          );
-          verbose(
-            `commitCheckedSameRef : ${commitCheckedSameRef} /${commitToCheckSameRefMax} `
-          );
-          exitNotFound();
+        for (const job of projectJobs) {
+            if (job.name === process.env.CI_JOB_NAME) {
+                verbose(
+                    `process job with same name, jobChecked=${jobChecked},` +
+                    ` commitCheckedSameJob=${commitCheckedSameJob}`
+                );
+                try {
+                    const tree = getTree(job.commit.id);
+                    verbose(
+                        "------------------------------     tree :     ----------------------------------\n" +
+                        tree +
+                        "--------------------------------------------------------------------------------"
+                    );
+                    if (currentTree === tree) {
+                        await extractArtifacts(job);
+                        fs.writeFileSync(ciSkipPath, "true");
+                        green(`✅ tree found in job ${job.web_url}`);
+                        process.exit(0);
+                    }
+                    if (job.ref === ciCommitRefName) {
+                        commitCheckedSameRef++;
+                        verbose(`The job have the same ref name (${commitCheckedSameRef})`);
+                    }
+                    commitCheckedSameJob++;
+                } catch (_) {
+                }
+                jobChecked++;
+                if (
+                    jobChecked >= jobToCheckMax ||
+                    commitCheckedSameJob >= commitToCheckSameJobMax ||
+                    commitCheckedSameRef >= commitToCheckSameRefMax
+                ) {
+                    verbose("[exit not found] : ");
+                    verbose(`jobChecked : ${jobChecked} /${jobToCheckMax} `);
+                    verbose(
+                        `commitCheckedSameJob : ${commitCheckedSameJob} /${commitToCheckSameJobMax} `
+                    );
+                    verbose(
+                        `commitCheckedSameRef : ${commitCheckedSameRef} /${commitToCheckSameRefMax} `
+                    );
+                    exitNotFound();
+                }
+            }
         }
-      }
     }
-  }
-  exitNotFound();
+    exitNotFound();
 }
 
 main().then();

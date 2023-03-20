@@ -56,7 +56,7 @@ pub async fn get_project_jobs(
 
 #[cfg(test)]
 mod tests {
-    use crate::gitlab::{deserialize_jobs, get_project_jobs, GitlabCommit, GitlabJob};
+    use crate::jobs::{deserialize_jobs, get_project_jobs, GitlabCommit, GitlabJob};
     use httptest::matchers::request;
     use httptest::responders::status_code;
     use httptest::{Expectation, Server};

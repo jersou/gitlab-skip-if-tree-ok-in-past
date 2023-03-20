@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::gitlab::GitlabJob;
+use crate::jobs::GitlabJob;
 use crate::log::yellow;
 use crate::verbose;
 use anyhow::{anyhow, Context};
@@ -38,6 +38,7 @@ pub async fn extract_artifacts(config: &Config, job: &GitlabJob) -> anyhow::Resu
         }
     }
 }
+
 async fn download_file(url: &str, file_path: &str) -> anyhow::Result<bool> {
     verbose!("download_file to {file_path}");
     let mut file = File::create(file_path).context("Error while creating downloaded file")?;
@@ -47,7 +48,6 @@ async fn download_file(url: &str, file_path: &str) -> anyhow::Result<bool> {
         .get(url.parse().context("parse url error")?)
         .await
         .context("Error while request the file")?;
-
     verbose!("download_file status {:?}", response.status());
     if response.status().is_success() {
         while let Some(chunk) = response.body_mut().data().await {
@@ -61,26 +61,26 @@ async fn download_file(url: &str, file_path: &str) -> anyhow::Result<bool> {
 fn extract_archive(archive_path: &str, output_path: &str) -> anyhow::Result<()> {
     verbose!("extract_archive {archive_path} to {output_path}");
     if archive_path.is_empty() {
-        return Err(anyhow!("archive_path is empty"));
+        Err(anyhow!("archive_path is empty"))
+    } else if output_path.is_empty() {
+        Err(anyhow!("output_path is empty"))
+    } else {
+        let repo_zip = std::path::Path::new(archive_path);
+        let zip_file = File::open(repo_zip).context("Error while opening archive file")?;
+        let mut archive =
+            zip::ZipArchive::new(zip_file).context("Error while decoding archive file")?;
+        archive
+            .extract(output_path)
+            .context("Error while extracting archive file")?;
+        Ok(())
     }
-    if output_path.is_empty() {
-        return Err(anyhow!("output_path is empty"));
-    }
-    let repo_zip = std::path::Path::new(archive_path);
-    let zip_file = File::open(repo_zip).context("Error while opening archive file")?;
-    let mut archive =
-        zip::ZipArchive::new(zip_file).context("Error while decoding archive file")?;
-    archive
-        .extract(output_path)
-        .context("Error while extracting archive file")?;
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::artifact::{download_file, extract_archive, extract_artifacts};
     use crate::config::Config;
-    use crate::gitlab::{GitlabCommit, GitlabJob};
+    use crate::jobs::{GitlabCommit, GitlabJob};
     use httptest::{matchers::*, responders::*, Expectation, Server};
     use hyper::http;
     use std::env::VarError;
