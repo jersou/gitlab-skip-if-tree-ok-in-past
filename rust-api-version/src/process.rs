@@ -19,10 +19,10 @@ pub struct ProcessResult {
 }
 
 async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
-    // 1. Check if the script has already been completed : check ci-skip file. If file exists, exit, else :
+    // 1. Check if the script has already been completed in the current job: check ci-skip file. If file exists, exit, else :
     let is_skip_done = check_skip_is_done(&config.ci_skip_path).await;
     // If file exists, exit
-    let result = match is_skip_done {
+    let process_result = match is_skip_done {
         Some(skip_ci) => ProcessResult {
             skip_ci,
             found_job: None,
@@ -32,11 +32,8 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
             // 3. Get last successful jobs of the project
             let job_ok = find_last_job_ok(config).await?;
 
-            //     5.3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
-            // 6. If no job found, write false in ci-skip file and exit with code > 0
-
             // extract job artifact
-            let process_result: ProcessResult = match job_ok {
+            let process_result = match job_ok {
                 Some(job) => {
                     extract_artifacts(config, &job).await?;
                     let trace_url =
@@ -47,7 +44,7 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
                             _ => job.web_url.clone(),
                         };
 
-                    // Important to keep for the next job that will parse this trace
+                    // Important to keep for the futur job that will parse this trace
                     println!("{SKIP_CI_OLDEST_ANCESTOR_KEY}={oldest_ancestor}");
                     ProcessResult {
                         skip_ci: true,
@@ -62,13 +59,15 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
                 },
             };
 
+            //     5.3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
+            // 6. If no job found, write false in ci-skip file and exit with code > 0
             write_skip_done(&config.ci_skip_path, process_result.skip_ci).await?;
 
             process_result
         }
     };
     println!("{}", SKIP_CI_DONE_KEY);
-    Ok(result)
+    Ok(process_result)
 }
 
 pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i32 {
@@ -79,15 +78,6 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
             let result = process(&config).await;
             verbose!("result = {result:?}");
             match result {
-                Err(e) => {
-                    red(&format!("❌ PROCESS ERROR : \n{e:#?}"));
-                    2
-                }
-                Ok(ProcessResult {
-                    skip_ci: true,
-                    found_job: None,
-                    ..
-                }) => 0,
                 Ok(ProcessResult {
                     skip_ci: true,
                     found_job: Some(job),
@@ -100,9 +90,18 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
                     ));
                     0
                 }
+                Ok(ProcessResult {
+                    skip_ci: true,
+                    found_job: None,
+                    ..
+                }) => 0,
                 Ok(ProcessResult { skip_ci: false, .. }) => {
                     yellow("❌ tree not found in last jobs of the project");
                     1
+                }
+                Err(e) => {
+                    red(&format!("❌ PROCESS ERROR : \n{e:#?}"));
+                    2
                 }
             }
         }
@@ -112,12 +111,11 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
         }
     };
 
-    let duration_micro = start.elapsed().as_nanos() / 1000;
-
+    let duration_micro = start.elapsed().as_nanos() / 1_000;
     verbose!(
         "exit code = {exit_code} ; duration : {}.{} ms",
-        duration_micro / 1000,
-        duration_micro % 1000
+        duration_micro / 1_000,
+        duration_micro % 1_000
     );
     exit_code
 }

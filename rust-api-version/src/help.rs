@@ -65,11 +65,15 @@ The skip-if-tree-ok-in-past environment variables :
 - SKIP_CI_VERBOSE: [optional default=false] "true" to enable verbose log
 "###;
 
-pub fn print_help() {
-    println!(
+pub fn get_version_msg() -> String {
+    format!(
         "skip-if-tree-ok-in-past version : rust-api-version {}",
         env!("CARGO_PKG_VERSION")
-    );
+    )
+}
+
+pub fn print_help() {
+    println!("{}", get_version_msg());
     println!("{HELP}");
 }
 

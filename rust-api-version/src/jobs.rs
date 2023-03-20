@@ -16,10 +16,10 @@ pub struct GitlabJob {
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
 pub struct GitlabCommit {
-    pub(crate) id: String,
+    pub id: String,
 }
 
-pub(crate) fn deserialize_jobs(jobs_json: &str) -> anyhow::Result<Vec<GitlabJob>> {
+pub fn deserialize_jobs(jobs_json: &str) -> anyhow::Result<Vec<GitlabJob>> {
     serde_json::from_str(jobs_json).context("deserialize jobs error")
 }
 
@@ -28,17 +28,10 @@ pub async fn get_project_jobs(
     page_num: u32,
     private_token: &str,
 ) -> anyhow::Result<Vec<GitlabJob>> {
-    verbose!(
-        "GET /jobs?scope=success&per_page=100&page={page_num}&private_token={}",
-        if private_token.is_empty() {
-            "".to_string()
-        } else {
-            "*".repeat(10)
-        },
-    );
     let url = format!(
         "{project_jobs_api_url}?scope=success&per_page=100&page={page_num}&private_token={private_token}",
     );
+    verbose!("GET {url}");
     let https = hyper_tls::HttpsConnector::new();
     let client = hyper::Client::builder().build::<_, hyper::Body>(https);
     let response = client

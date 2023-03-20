@@ -6,22 +6,22 @@ use tokio::fs;
 // check if the skip is already done, and return the result from the skip-ci file
 pub async fn check_skip_is_done(path_str: &str) -> Option<bool> {
     let path = Path::new(path_str);
-    if fs::try_exists(path).await.unwrap_or(false) {
-        let content = fs::read_to_string(path).await;
-        match content {
-            Ok(content_str) => {
-                let skip_is_ok = content_str.eq("true");
-                verbose!("skip-ci file exists with this content : {}", content_str);
+    match fs::try_exists(path).await {
+        Ok(true) => match fs::read_to_string(path).await {
+            Ok(content) => {
+                let skip_is_ok = content.eq("true");
+                verbose!("skip-ci file exists with this content : {}", content);
                 Some(skip_is_ok)
             }
             Err(_) => {
                 verbose!("skip-ci file read error");
                 None
             }
+        },
+        _ => {
+            verbose!("skip-ci file doesn't exists");
+            None
         }
-    } else {
-        verbose!("skip-ci file doesn't exists");
-        None
     }
 }
 
@@ -29,12 +29,8 @@ pub async fn check_skip_is_done(path_str: &str) -> Option<bool> {
 pub async fn write_skip_done(path_str: &str, result: bool) -> anyhow::Result<()> {
     verbose!("write {result} to skip-ci file {path_str}");
     let path = Path::new(path_str);
-    let result_str = if result {
-        "true".as_bytes()
-    } else {
-        "false".as_bytes()
-    };
-    fs::write(path, result_str)
+    let result_str = if result { "true" } else { "false" };
+    fs::write(path, result_str.as_bytes())
         .await
         .context("write skip done error")?;
     Ok(())
