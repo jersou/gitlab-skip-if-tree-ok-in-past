@@ -1,6 +1,6 @@
 [package]
 name = "gitlab-skip-if-tree-ok-in-past-rust-api-version"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [profile.release]
@@ -20,19 +20,10 @@ tempdir = "0.3.7"
 serde = { version = "1.0.156", features = ["derive"] }
 serde_json = { version = "1.0.94", features = ["default"] }
 anyhow = "1.0.69"
-hyper-tls = "0.5.0"
-
-# Add openssl-sys as a direct dependency so it can be cross compiled to
-# x86_64-unknown-linux-musl using the "vendored" feature below
-openssl-sys = "*"
+hyper-rustls = { version = "0.23.2", features = ["default", "webpki-roots"] }
 
 [dev-dependencies]
 gag = "1.0.0"
 temp-env = "0.3.2"
 httptest = "0.15.4"
 cargo-tarpaulin = "0.25.1"
-
-[features]
-# Force openssl-sys to staticly link in the openssl library. Necessary when
-# cross compiling to x86_64-unknown-linux-musl.
-vendored = ["openssl-sys/vendored"]

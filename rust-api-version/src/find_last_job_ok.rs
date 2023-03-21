@@ -34,6 +34,7 @@ pub async fn find_last_job_ok(config: &Config) -> anyhow::Result<Option<GitlabJo
             .filter(|job| job.name == config.ci_job_name && job.status == "success")
             // 5. For each job :
             .find(|job| {
+                verbose!("Check job {}", job.id);
                 commit_to_check_same_job += 1;
                 if let Ok(ci_commit_ref_name) = config.ci_commit_ref_name.clone() {
                     if job.job_ref.eq(&ci_commit_ref_name) {

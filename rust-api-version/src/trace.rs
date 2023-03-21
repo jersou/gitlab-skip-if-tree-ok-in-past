@@ -16,8 +16,14 @@ pub fn get_trace_url(jobs_api_url: &str, job_id: u32, api_read_token: &str) -> S
 // find the [skip-ci...] data in the job log "url" (.../jobs/JOB_ID/raw)
 pub async fn parse_oldest_ancestor_from_job_trace(url: &str) -> anyhow::Result<Option<String>> {
     verbose!("parse_job_trace from {url}");
-    let https = hyper_tls::HttpsConnector::new();
-    let client = hyper::Client::builder().build::<_, hyper::Body>(https);
+
+    let https = hyper_rustls::HttpsConnectorBuilder::new()
+        .with_webpki_roots()
+        .https_or_http()
+        .enable_http1()
+        .build();
+    let client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
+
     let mut response = client
         .get(url.parse().context("parse url error")?)
         .await

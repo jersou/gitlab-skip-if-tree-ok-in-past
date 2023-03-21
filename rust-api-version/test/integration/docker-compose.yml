@@ -22,7 +22,7 @@ services:
     working_dir: /repo
     environment:
       SKIP_CI_VERBOSE: true
-      CI_API_V4_URL: http://gitlab-fake-api/api/
+      CI_API_V4_URL: http://gitlab-fake-api/api
       SKIP_IF_TREE_OK_IN_PAST: root-1
       API_READ_TOKEN: ___API_READ_TOKEN___
       CI_PROJECT_ID: 123
@@ -84,6 +84,7 @@ services:
       "
     ]
     environment:
+      RUST_BACKTRACE: full
       SKIP_CI_VERBOSE: true
       CI_API_V4_URL: http://gitlab-fake-api/api
       SKIP_IF_TREE_OK_IN_PAST: root-1

@@ -170,7 +170,7 @@ SERVICE-C-rust-api:
   image: alpine
   extends: .base-job
   variables:
-    SKIP_CI_VERBOSE: true
+    SKIP_CI_VERBOSE: "true"
     SKIP_IF_TREE_OK_IN_PAST: .gitlab-ci.yml rust-api-version
   script:
     - time rust-api-version/skip-if-tree-ok-in-past || _example/service-B/test.sh

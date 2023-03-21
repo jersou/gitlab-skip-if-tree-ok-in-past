@@ -6,7 +6,7 @@ cd "$dir_path/.."
 
 SKIP_CI_VERBOSE=true \
     RUST_TEST_NOCAPTURE=1 \
-      cargo tarpaulin \
+      cargo +nightly tarpaulin \
           --out html \
           --output-dir target \
               -- --test-threads=1
