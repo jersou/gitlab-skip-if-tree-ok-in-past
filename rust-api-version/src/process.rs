@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::find_last_job_ok::find_last_job_ok;
 use crate::jobs::GitlabJob;
 use crate::log::{green, red, yellow};
+use crate::process::ProcessResult::{JobFound, JobNotFound, SkipCiFileExists};
 use crate::skip_ci_file::{check_skip_is_done, write_skip_done};
 use crate::trace::{
     get_trace_url, parse_oldest_ancestor_from_job_trace, SKIP_CI_DONE_KEY,
@@ -11,23 +12,18 @@ use crate::trace::{
 use crate::verbose;
 use tokio::time::Instant;
 
-#[derive(Debug)]
-pub struct ProcessResult {
-    pub skip_ci: bool,
-    pub found_job: Option<GitlabJob>,
-    pub oldest_ancestor: Option<String>,
+#[derive(Debug, PartialEq)]
+pub enum ProcessResult {
+    SkipCiFileExists(bool),
+    JobFound(GitlabJob, String),
+    JobNotFound,
 }
 
 async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
     // 1. Check if the script has already been completed in the current job: check ci-skip file. If file exists, exit, else :
-    let is_skip_done = check_skip_is_done(&config.ci_skip_path).await;
-    // If file exists, exit
-    let process_result = match is_skip_done {
-        Some(skip_ci) => ProcessResult {
-            skip_ci,
-            found_job: None,
-            oldest_ancestor: None,
-        },
+    let process_result = match check_skip_is_done(&config.ci_skip_path).await {
+        // If file exists, exit
+        Some(skip_ci) => SkipCiFileExists(skip_ci),
         None => {
             // 3. Get last successful jobs of the project
             let job_ok = find_last_job_ok(config).await?;
@@ -46,22 +42,19 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
 
                     // Important to keep for the futur job that will parse this trace
                     println!("{SKIP_CI_OLDEST_ANCESTOR_KEY}={oldest_ancestor}");
-                    ProcessResult {
-                        skip_ci: true,
-                        found_job: Some(job),
-                        oldest_ancestor: Some(oldest_ancestor),
-                    }
+
+                    JobFound(job, oldest_ancestor)
                 }
-                None => ProcessResult {
-                    skip_ci: false,
-                    found_job: None,
-                    oldest_ancestor: None,
-                },
+                None => JobNotFound,
             };
 
             //     5.3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
             // 6. If no job found, write false in ci-skip file and exit with code > 0
-            write_skip_done(&config.ci_skip_path, process_result.skip_ci).await?;
+            match process_result {
+                JobFound(..) => write_skip_done(&config.ci_skip_path, true).await?,
+                JobNotFound => write_skip_done(&config.ci_skip_path, false).await?,
+                SkipCiFileExists(..) => {}
+            };
 
             process_result
         }
@@ -78,27 +71,17 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
             let result = process(&config).await;
             verbose!("result = {result:?}");
             match result {
-                Ok(ProcessResult {
-                    skip_ci: true,
-                    found_job: Some(job),
-                    oldest_ancestor,
-                }) => {
+                Ok(JobFound(job, oldest_ancestor)) => {
                     green(&format!("✅ tree found in job {}  ", &job.web_url));
-                    green(&format!(
-                        "✅ the oldest ancestor found : {}  ",
-                        oldest_ancestor.unwrap_or_default()
-                    ));
+                    green(&format!("✅ the oldest ancestor found : {oldest_ancestor}"));
                     0
                 }
-                Ok(ProcessResult {
-                    skip_ci: true,
-                    found_job: None,
-                    ..
-                }) => 0,
-                Ok(ProcessResult { skip_ci: false, .. }) => {
+                Ok(JobNotFound) => {
                     yellow("❌ tree not found in last jobs of the project");
                     1
                 }
+                Ok(SkipCiFileExists(true)) => 0,
+                Ok(SkipCiFileExists(false)) => 3,
                 Err(e) => {
                     red(&format!("❌ PROCESS ERROR : \n{e:#?}"));
                     2
@@ -123,6 +106,7 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
 #[cfg(test)]
 pub mod tests {
     use crate::config::Config;
+    use crate::process::ProcessResult::{JobFound, JobNotFound, SkipCiFileExists};
     use crate::process::{process, process_with_exit_code};
     use anyhow::Error;
     use git2::{Oid, Repository};
@@ -248,12 +232,16 @@ pub mod tests {
         repo.set_head_detached(Oid::from_str("5e694dadd2979a2680c98c88a2f98df9787947d2").unwrap())
             .unwrap();
         let config = create_config_ok(&tmp_dir, &url);
-        let res = process(&config).await.unwrap();
-        assert_eq!(res.found_job.unwrap().id, 12345678);
-        assert_eq!(
-            res.oldest_ancestor.unwrap(),
-            "http://gitlab-fake-api/api/projects/123/jobs/11"
-        );
+        match process(&config).await.unwrap() {
+            JobFound(job, oldest_ancestor) => {
+                assert_eq!(job.id, 12345678);
+                assert_eq!(
+                    oldest_ancestor,
+                    "http://gitlab-fake-api/api/projects/123/jobs/11"
+                );
+            }
+            _ => panic!(),
+        };
     }
 
     #[tokio::test]
@@ -272,10 +260,13 @@ pub mod tests {
         repo.set_head_detached(Oid::from_str("5e694dadd2979a2680c98c88a2f98df9787947d2").unwrap())
             .unwrap();
         let config = create_config_ok(&tmp_dir, &url);
-        let res = process(&config).await.unwrap();
-        let job = res.found_job.unwrap();
-        assert_eq!(job.id, 12345678);
-        assert_eq!(res.oldest_ancestor.unwrap(), job.web_url);
+        match process(&config).await.unwrap() {
+            JobFound(job, oldest_ancestor) => {
+                assert_eq!(job.id, 12345678);
+                assert_eq!(oldest_ancestor, job.web_url);
+            }
+            _ => panic!(),
+        };
     }
 
     #[tokio::test]
@@ -307,10 +298,13 @@ pub mod tests {
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
         };
-        let res = process(&config).await.unwrap();
-        let job = res.found_job.unwrap();
-        assert_eq!(job.id, 12345678);
-        assert_eq!(res.oldest_ancestor.unwrap(), job.web_url);
+        match process(&config).await.unwrap() {
+            JobFound(job, oldest_ancestor) => {
+                assert_eq!(job.id, 12345678);
+                assert_eq!(oldest_ancestor, job.web_url);
+            }
+            _ => panic!(),
+        };
     }
 
     #[tokio::test]
@@ -342,6 +336,29 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn test_process_with_exit_code_job_not_found() {
+        let (tmp_dir, _) = prepare_tmp_repo();
+        let server = Server::run();
+        let url = add_jobs_expect(&server);
+        let config = Config {
+            api_read_token: "aaa".to_string(),
+            ci_commit_ref_name: Ok("branch1".to_string()),
+            ci_job_name: "jobA".to_string(),
+            ci_job_token: Ok("bbb".to_string()),
+            verbose: false,
+            files_to_check: "root-2 Service-A/file-A1 Service-A/file-A2".to_string(),
+            project_path: tmp_dir.path().to_str().unwrap().to_string(),
+            jobs_api_url: url.clone(),
+            ci_skip_path: tmp_dir.path().join("skip-ci").to_str().unwrap().to_string(),
+            page_to_fetch_max: 1,
+            commit_to_check_same_ref_max: 10,
+            commit_to_check_same_job_max: 0,
+        };
+        let res = process_with_exit_code(Ok(config.clone())).await;
+        assert_eq!(res, 1);
+    }
+
+    #[tokio::test]
     async fn test_process_none_job_d() {
         let (tmp_dir, _) = prepare_tmp_repo();
         let server = Server::run();
@@ -360,8 +377,8 @@ pub mod tests {
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
         };
-        let res = process(&config).await;
-        assert!(res.unwrap().found_job.is_none());
+        let res = process(&config).await.unwrap();
+        assert!(matches!(res, JobNotFound));
     }
 
     #[tokio::test]
@@ -384,8 +401,7 @@ pub mod tests {
             commit_to_check_same_job_max: 1,
         };
         let res = process(&config).await.unwrap();
-        assert!(res.found_job.is_none());
-        assert!(!res.skip_ci);
+        assert!(matches!(res, JobNotFound));
     }
 
     #[tokio::test]
@@ -408,8 +424,7 @@ pub mod tests {
             commit_to_check_same_job_max: 0,
         };
         let res = process(&config).await.unwrap();
-        assert!(res.found_job.is_none());
-        assert!(!res.skip_ci);
+        assert!(matches!(res, JobNotFound));
     }
 
     #[tokio::test]
@@ -449,8 +464,7 @@ pub mod tests {
         let path = tmp_dir.path().join("skip-ci");
         fs::write(&path, "true").unwrap();
         let res = process(&config).await.unwrap();
-        assert!(res.found_job.is_none());
-        assert!(res.skip_ci);
+        assert!(matches!(res, SkipCiFileExists(true)));
     }
     #[tokio::test]
     async fn test_process_none_skip_ci_err() {
@@ -485,9 +499,8 @@ pub mod tests {
         let path = tmp_dir.path().join("skip-ci");
         fs::write(&path, "false").unwrap();
         let res = process(&config).await.unwrap();
-        assert!(res.found_job.is_none());
-        assert!(!res.skip_ci);
+        assert!(matches!(res, SkipCiFileExists(false)));
         let res = process_with_exit_code(Ok(config)).await;
-        assert_eq!(res, 1);
+        assert_eq!(res, 3);
     }
 }
