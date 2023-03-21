@@ -20,7 +20,8 @@ reference but have been tested since the fork.
 
 Implementation summary :
 
-1. Check if the script has already been completed : check ci-skip file. If file
+1. Check if the script has already been completed : check if the ci-skip file
+   exists. If file
    exists, exit, else :
 2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current
    HEAD
@@ -34,14 +35,16 @@ Implementation summary :
        code 0
 6. If no job found, write false in ci-skip file and exit with code > 0
 
+![diagram](./diagram.svg)
+
 ⚠️ Requirements :
 
-- the variable SKIP_IF_TREE_OK_IN_PAST must contain the paths used by the job
+- the variable `SKIP_IF_TREE_OK_IN_PAST` must contain the paths used by the job
 - if the nested jobs of current uses the dependencies key with current, the
   dependencies files need to be in an artifact
 - CI variables changes are not detected
-- need API_READ_TOKEN (project access tokens that have read_api scope)
-- set GIT_DEPTH variable to 1000 or more
+- need `API_READ_TOKEN` (project access tokens that have read_api scope)
+- set `GIT_DEPTH` variable to 1000 or more
 
 ```yaml
 Usage in .gitlab-ci.yml file:
@@ -59,12 +62,13 @@ Usage in .gitlab-ci.yml file:
 
 The skip-if-tree-ok-in-past environment variables :
 
-- SKIP_IF_TREE_OK_IN_PAST: [required]  must contain the paths used by the job
-- API_READ_TOKEN: [required] project access tokens that have read_api scope
-- SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX: [optional default=100] stop check if
+- `SKIP_IF_TREE_OK_IN_PAST`: [required]  must contain the paths used by the job
+- `API_READ_TOKEN`: [required] project access tokens that have read_api scope
+- `SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX`: [optional default=100] stop check if
   this limit is reached
-- SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX: [optional default=3] stop check if this
+- `SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX`: [optional default=3] stop check if
+  this
   limit is reached
-- SKIP_CI_PAGE_TO_FETCH_MAX: [optional default=5] max queries to the gitlabAPI
+- `SKIP_CI_PAGE_TO_FETCH_MAX`: [optional default=5] max queries to the gitlabAPI
   /jobs
-- SKIP_CI_VERBOSE: [optional default=false] "true" to enable verbose log
+- `SKIP_CI_VERBOSE`: [optional default=false] "true" to enable verbose log

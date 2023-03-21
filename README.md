@@ -48,6 +48,11 @@ but the implementations of the current projet use Gitlab API:
        code 0
 6. If no job found, write false in ci-skip file and exit with code > 0
 
+From [rust-api-version/README.md](rust-api-version/README.md):
+
+![diagram](./rust-api-version/diagram.svg)
+
+
 ### ⚠️ Warning/Requirements :
 
 - the variable `SKIP_IF_TREE_OK_IN_PAST` must contain the paths used by the job
