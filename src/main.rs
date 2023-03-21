@@ -1,20 +1,19 @@
 mod artifact;
 mod config;
+mod find_last_job_ok;
 mod git;
-mod gitlab;
 mod help;
+mod jobs;
 mod log;
 mod process;
+mod skip_ci_file;
 mod trace;
 
 #[cfg(not(tarpaulin_include))]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     if std::env::args().len() <= 1 {
-        verbose!(
-            "skip-if-tree-ok-in-past version : rust-api-version {}",
-            env!("CARGO_PKG_VERSION")
-        );
+        verbose!("{}", help::get_version_msg());
         let config = config::config_from_env();
         let exit_code = process::process_with_exit_code(config).await;
         std::process::exit(exit_code);

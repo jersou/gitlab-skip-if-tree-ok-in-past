@@ -1,0 +1,38 @@
+@startuml
+<style>
+activityDiagram {
+  diamond {
+    BackgroundColor #ffcc88
+  }
+}
+</style>
+
+start
+
+if (\n  The skip-ci has already been completed  \n = the ci-skip file exists ?\n) is (yes) then
+
+
+if (\n  The skip-ci content is ?  \n) is (true) then
+  #palegreen:exit 0 silently ;
+  stop
+else (false)
+  #yellow:exit 3 silently ;
+  stop
+endif
+
+else (no)
+#ccccff:Get the "git ls-tree" of the\n"$SKIP_IF_TREE_OK_IN_PAST"\nfiles of the current HEAD\n =HEAD_PARTIAL_TREE;
+#ffcccc:Get last successful jobs of the project\nfrom the Gitlab API;
+#ffcccc:Filter jobs : keep current job name only;
+while (\n  There are still other jobs to check  \n) is (yes)
+   #ccccff:Get the "git ls-tree" of the\n"$SKIP_IF_TREE_OK_IN_PAST"\nfiles of the checked job commit\n =JOB_PARTIAL_TREE;
+   if (\n  this partial tree is equals to \n  the current HEAD partial tree ?  \n    HEAD_PARTIAL_TREE\n        == JOB_PARTIAL_TREE ?\n) is (true) then
+     #palegreen:✅ job found :\nwrite true in ci-skip file\nand exit with code 0;
+     stop
+   else (no)
+   endif
+endwhile (no)
+#yellow:❌ job not found :\nwrite false in ci-skip file\nand exit with code 1;
+stop
+
+@enduml
