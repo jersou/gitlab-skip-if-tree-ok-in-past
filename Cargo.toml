@@ -1,6 +1,6 @@
 [package]
 name = "gitlab-skip-if-tree-ok-in-past-rust-api-version"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [profile.release]
@@ -12,15 +12,15 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-zip = { version = "0.6.4", features = ["default"] }
+zip = { version = "0.6.4", default-features = false, features = ["deflate"] }
 git2 = { version = "0.16.1", default-features = false }
 tokio = { version = "1.26.0", features = ["fs", "macros"] }
-hyper = { version = "0.14.25", features = ["client", "tcp", "http1"] } # "http2"
+hyper = { version = "0.14.25" }
+hyper-rustls = { version = "0.23.2", default-features = false, features = ["tokio-runtime", "http1", "tls12", "webpki-roots"] }
 tempdir = "0.3.7"
 serde = { version = "1.0.156", features = ["derive"] }
 serde_json = { version = "1.0.94", features = ["default"] }
 anyhow = "1.0.69"
-hyper-rustls = { version = "0.23.2", features = ["default", "webpki-roots"] }
 
 [dev-dependencies]
 gag = "1.0.0"
