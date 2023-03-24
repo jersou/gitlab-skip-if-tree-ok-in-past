@@ -19,8 +19,8 @@ cargo +nightly build \
                    --target x86_64-unknown-linux-musl  \
                    -Z build-std=std,panic_abort  \
                    -Z build-std-features=panic_immediate_abort
-cp target/x86_64-unknown-linux-musl/release/gitlab-skip-if-tree-ok-in-past-rust-api-version ./skip-if-tree-ok-in-past
-upx --best --lzma ./skip-if-tree-ok-in-past
+rm -f ./skip-if-tree-ok-in-past
+upx --best --ultra-brute -o ./skip-if-tree-ok-in-past target/x86_64-unknown-linux-musl/release/gitlab-skip-if-tree-ok-in-past-rust-api-version
 
 ! ldd skip-if-tree-ok-in-past
 
@@ -68,3 +68,31 @@ upx --best --lzma ./skip-if-tree-ok-in-past
 #    0.2%   0.9% 11.9KiB                                       [Unknown] chacha20_poly1305_seal_avx2
 #   23.5%  86.6%  1.1MiB                                                 And 4572 smaller methods. Use -n N to show more.
 #   27.2% 100.0%  1.3MiB                                                 .text section size, the file size is 4.8MiB
+
+
+# https://github.com/google/bloaty
+# $ bloaty gitlab-skip-if-tree-ok-in-past-rust-api-version  -d compileunits
+#     FILE SIZE        VM SIZE
+#  --------------  --------------
+#   20.4%   537Ki  34.1%   537Ki    [section .text]/crt/rcrt1.c
+#   18.0%   474Ki  19.0%   299Ki    ../src_musl/crt/rcrt1.cext]
+#   14.2%   373Ki   9.5%   149Ki    [268 Others]]
+#    8.5%   224Ki   2.8%  44.5Ki    crypto/curve25519/curve25519.ce25519/curve25519.c
+#    6.1%   160Ki   9.5%   149Ki    crypto/fipsmodule/ec/ecp_nistz256.cmodule/ec/ecp_nistz256.c
+#    4.7%   123Ki   0.0%       0    [section .strtab]trtab]
+#    4.6%   122Ki   7.7%   122Ki    [section .rodata]odata]
+#    4.1%   108Ki   0.4%  6.72Ki    crypto/poly1305/poly1305_vec.c1305/poly1305_vec.c
+#    3.9%   101Ki   3.8%  60.3Ki    ../src_musl/src/exit/exit.c/src/exit/exit.c
+#    3.0%  79.0Ki   0.3%  4.63Ki    crypto/fipsmodule/aes/aes_nohw.cmodule/aes/aes_nohw.c
+#    2.2%  58.3Ki   0.0%       0    [section .symtab]ymtab]
+#    1.9%  50.5Ki   3.2%  50.5Ki    [section .eh_frame]h_frame]
+#    1.8%  48.3Ki   2.5%  39.8Ki    /home/jer/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/chacha20_poly1305_x86_64-elf.Sgistry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/chacha20_poly1305_x86_64-elf.S
+#    1.2%  32.8Ki   0.3%  4.02Ki    crypto/fipsmodule/ec/gfp_p384.cata.rel.ro]
+#    0.0%       0   2.1%  32.4Ki    [section .data.rel.ro]module/ec/gfp_p384.c
+#    1.1%  28.8Ki   0.1%  1.91Ki    crypto/limbs/limbs.cs/limbs.c
+#    0.9%  24.8Ki   1.2%  19.5Ki    ../src_musl/src/stdio/vfprintf.c/src/stdio/vfprintf.c
+#    0.9%  23.6Ki   1.4%  22.3Ki    ../src_musl/src/passwd/nscd_query.c/src/passwd/nscd_query.c
+#    0.8%  22.1Ki   1.1%  17.1Ki    /home/jer/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/p256-x86_64-asm-elf.Sgistry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/p256-x86_64-asm-elf.S
+#    0.8%  19.9Ki   0.0%       0    [section .debug_frame]ebug_frame]
+#    0.7%  17.4Ki   0.9%  13.6Ki    /home/jer/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/x86_64-mont5-elf.Sgistry/src/index.crates.io-6f17d22bba15001f/ring-0.16.20/pregenerated/x86_64-mont5-elf.S
+#  100.0%  2.57Mi 100.0%  1.54Mi    TOTAL

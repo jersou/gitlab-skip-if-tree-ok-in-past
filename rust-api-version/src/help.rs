@@ -16,23 +16,72 @@ for long running branch, the files can be different from the compare_to
 reference but have been tested since the fork.
 
 Implementation summary :
-
 1. Check if the script has already been completed : check ci-skip file. If file
    exists, exit, else :
-2. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST" of the current
-   HEAD
+2. Get the "git ls-tree" of "$SKIP_IF_TREE_OK_IN_PAST" of the current HEAD
 3. Get last successful jobs of the project
 4. Filter jobs : keep current job only
 5. For each job :
-    1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
-    2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" (see
-       2.)
-    3. If the "git ls-tree" are equals, write true in ci-skip file and exit with
-       code 0
+  1. Get the "git ls-tree" of the tree "$SKIP_IF_TREE_OK_IN_PAST"
+  2. Check if this "git ls-tree" equals the current HEAD "git ls-tree" (see 2.)
+  3. If the "git ls-tree" are equals, write true in ci-skip file and exit 0
 6. If no job found, write false in ci-skip file and exit with code > 0
 
-⚠️ Requirements :
+   ┌──────────────────────────────────────┐
+yes│The skip-ci has already been completed│no
+┌──┤= the ci-skip file exists ?           ├──┐
+│  └──────────────────────────────────────┘  │
+│ ┌────────────────────────┐  ┌──────────────┴─────────────┐
+└─┤The skip-ci content is ?│  │Get the "git ls-tree" of the│
+  └────┬──────────────┬────┘  │"$SKIP_IF_TREE_OK_IN_PAST"  │
+   true│              │false  │files of the current HEAD   │
+  ┌────┴───┐      ┌───┴────┐  │=HEAD_PARTIAL_TREE          │
+  │ exit 0 │      │ exit 3 │  └───────┬────────────────────┘
+  └────┬───┘      └───┬────┘          │
+       ●              ●               │
+      ┌───────────────────────────────┴───────┐
+      │Get last successful jobs of the project│
+      │from the Gitlab API                    │
+      └─────────────────┬─────────────────────┘
+     ┌──────────────────┴─────────────────────┐
+     │Filter jobs : keep current job name only│
+     └──────────────────┬─────────────────────┘
+    no┌─────────────────┴─────────────────┐
+  ┌───┤There are still other jobs to check│◄──┐
+  │   └─────────────────┬─────────────────┘   │
+  │                     │yes                  │
+  │     ┌───────────────┴───────────────┐     │
+  │     │Get the "git ls-tree" of the   │     │
+  │     │"$SKIP_IF_TREE_OK_IN_PAST"     │     │
+  │     │files of the checked job commit│     │
+  │     │=JOB_PARTIAL_TREE              │     │
+  │     └───────────────┬───────────────┘     │
+  │     ┌───────────────┴───────────────┐     │
+  │     │this partial tree is equals to │     │
+  │     │the current HEAD partial tree ?│no   │
+  │     │HEAD_PARTIAL_TREE              ├─────┘
+  │     │== JOB_PARTIAL_TREE ?          │
+  │     └───────────────┬───────────────┘
+  │                     │yes
+  │  ┌──────────────────┴──────────────────┐
+  │  │Extract the artifact of the found job│
+  │  └──────────────────┬──────────────────┘
+  │     ┌───────────────┴───────────────┐
+  │     │Get the trace of the found job │
+  │     │to log the oldest ancestor link│
+  │     └───────────────┬───────────────┘
+  │       ┌─────────────┴────────────┐
+  │       │job found :               │
+  │       │write true in ci-skip file├─●
+  │       │and exit with code 0      │
+  │       └──────────────────────────┘
+  │       ┌───────────────────────────┐
+  │       │job not found :            │
+  └──────►│write false in ci-skip file├─●
+          │and exit with code 1       │
+          └───────────────────────────┘
 
+⚠️ Requirements :
 - the variable SKIP_IF_TREE_OK_IN_PAST must contain the paths used by the job
 - if the nested jobs of current uses the dependencies key with current, the
   dependencies files need to be in an artifact
@@ -53,7 +102,6 @@ Usage in .gitlab-ci.yml file :
         - ./skip-if-tree-ok-in-past || service-A/test3.sh
 
 The skip-if-tree-ok-in-past environment variables :
-
 - SKIP_IF_TREE_OK_IN_PAST: [required]  must contain the paths used by the job
 - API_READ_TOKEN: [required] project access tokens that have read_api scope
 - SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX: [optional default=100] stop check if

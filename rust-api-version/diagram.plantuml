@@ -26,7 +26,9 @@ else (no)
 #ffcccc:Filter jobs : keep current job name only;
 while (\n  There are still other jobs to check  \n) is (yes)
    #ccccff:Get the "git ls-tree" of the\n"$SKIP_IF_TREE_OK_IN_PAST"\nfiles of the checked job commit\n =JOB_PARTIAL_TREE;
-   if (\n  this partial tree is equals to \n  the current HEAD partial tree ?  \n    HEAD_PARTIAL_TREE\n        == JOB_PARTIAL_TREE ?\n) is (true) then
+   if (\n  this partial tree is equals to \n  the current HEAD partial tree ?  \n    HEAD_PARTIAL_TREE\n        == JOB_PARTIAL_TREE ?\n) is (yes) then
+     #palegreen:Extract the artifact of the found job;
+     #palegreen:Get the trace of the found job\nto log the oldest ancestor link;
      #palegreen:✅ job found :\nwrite true in ci-skip file\nand exit with code 0;
      stop
    else (no)

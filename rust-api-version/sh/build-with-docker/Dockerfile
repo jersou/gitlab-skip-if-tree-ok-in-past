@@ -1,6 +1,6 @@
 FROM debian:buster-slim
 
-RUN apt update && apt upgrade && apt install -y upx curl build-essential musl-tools
+RUN apt update && apt upgrade -y && apt install -y upx curl build-essential musl-tools
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > /tmp/rustup-init.sh
 RUN sh /tmp/rustup-init.sh -y -v
 ENV PATH=/root/.cargo/bin:$PATH

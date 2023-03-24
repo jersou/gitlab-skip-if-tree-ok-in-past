@@ -20,7 +20,7 @@ This project contains 5 implementations of the issue described bellow :
 * a Deno implementation, that require : git, nodejs, unzip
 * a Go implementation, that require : nothing except the 1.9Mo binary
   file `skip-if-tree-ok-in-past`
-* **a Rust implementation**, that require : nothing except the 0.8Mo binary
+* **a Rust implementation**, that require : nothing except the 764 Ko binary
   file `skip-if-tree-ok-in-past`
 
 **The recommended version is the Rust which has no dependency and is 100%
