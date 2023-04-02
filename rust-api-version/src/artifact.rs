@@ -103,7 +103,7 @@ mod tests {
         );
         let url = server.url_str("/api/123/jobs/456/artifact");
         let tmp_dir = tempdir().unwrap();
-        let tmp_path = tmp_dir.into_path().join("artifact.txt");
+        let tmp_path = tmp_dir.path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file(&url, tmp_path_str).await.unwrap();
         assert!(res);
@@ -120,7 +120,7 @@ mod tests {
         );
         let url = server.url_str("/api/123/jobs/456/artifact");
         let tmp_dir = tempdir().unwrap();
-        let tmp_path = tmp_dir.into_path().join("artifact.txt");
+        let tmp_path = tmp_dir.path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file(&url, tmp_path_str).await.unwrap();
         assert!(!res);
@@ -129,7 +129,7 @@ mod tests {
     #[tokio::test]
     async fn test_download_file_ko_connect_error() {
         let tmp_dir = tempdir().unwrap();
-        let tmp_path = tmp_dir.into_path().join("artifact.txt");
+        let tmp_path = tmp_dir.path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file("http://localhost:45546/zzzzz/gitlab/api", tmp_path_str)
             .await
