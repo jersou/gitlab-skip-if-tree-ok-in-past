@@ -1,3 +1,5 @@
+use log::info;
+
 // print msg only if SKIP_CI_VERBOSE env var == true
 #[macro_export]
 macro_rules! verbose {
@@ -14,6 +16,7 @@ macro_rules! verbose {
 
 pub fn red(msg: &str) {
     println!("\x1b[1;41;30mSKIP-CI:  {msg}  \x1b[0m");
+    info!("TTTTTTTTTTTTTTTTTTTTTTTTT")
 }
 
 pub fn green(msg: &str) {
@@ -27,7 +30,8 @@ pub fn yellow(msg: &str) {
 // RUST_TEST_NOCAPTURE=1 cargo test -- --test-threads=1
 #[cfg(test)]
 mod tests {
-    use crate::log::{green, red, yellow};
+    use crate::skipci_log::{green, red, yellow};
+    use env_logger::Env;
     use gag::BufferRedirect;
     use std::env;
     use std::io::Read;
@@ -88,6 +92,12 @@ mod tests {
                 "\u{1b}[1;41;30mSKIP-CI:  test  \u{1b}[0m\n"
             );
         }
+    }
+
+    #[test]
+    fn test_red2222() {
+        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        red("test");
     }
 
     #[test]

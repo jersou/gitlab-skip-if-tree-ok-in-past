@@ -1,19 +1,18 @@
 use crate::config::Config;
 use crate::jobs::GitlabJob;
-use crate::log::yellow;
+use crate::skipci_log::yellow;
 use crate::verbose;
 use anyhow::{anyhow, Context};
 use hyper::body::HttpBody;
 use std::fs::File;
 use std::io::Write;
-use tempdir::TempDir;
+use tempfile::tempdir;
 
 pub async fn extract_artifacts(config: &Config, job: &GitlabJob) -> anyhow::Result<bool> {
     match job.artifacts_expire_at.clone() {
         Some(artifacts_expire_at) => {
             verbose!("Artifact expire_at : {artifacts_expire_at}");
-            let tmp_dir =
-                TempDir::new("skip_ci_extract_artifacts").context("Create temp dir error")?;
+            let tmp_dir = tempdir().context("Create temp dir error")?;
             let tmp_file = tmp_dir.path().join("artifact.zip");
             let tmp_file_path = tmp_file.to_str().context("Error path to str")?;
             let token = &config
@@ -92,7 +91,7 @@ mod tests {
     use std::env::VarError;
     use std::fs::File;
     use std::io::{BufReader, Read};
-    use tempdir::TempDir;
+    use tempfile::{tempdir, TempDir};
     use tokio::fs;
 
     #[tokio::test]
@@ -103,7 +102,7 @@ mod tests {
                 .respond_with(status_code(200).body("abc")),
         );
         let url = server.url_str("/api/123/jobs/456/artifact");
-        let tmp_dir = TempDir::new("test_download_file").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let tmp_path = tmp_dir.into_path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file(&url, tmp_path_str).await.unwrap();
@@ -120,7 +119,7 @@ mod tests {
                 .respond_with(status_code(404).body("abc")),
         );
         let url = server.url_str("/api/123/jobs/456/artifact");
-        let tmp_dir = TempDir::new("test_download_file").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let tmp_path = tmp_dir.into_path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file(&url, tmp_path_str).await.unwrap();
@@ -129,7 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_file_ko_connect_error() {
-        let tmp_dir = TempDir::new("test_download_file").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let tmp_path = tmp_dir.into_path().join("artifact.txt");
         let tmp_path_str = tmp_path.to_str().unwrap();
         let res = download_file("http://localhost:45546/zzzzz/gitlab/api", tmp_path_str)
@@ -156,7 +155,7 @@ mod tests {
         );
     }
     fn prepare_tmpdir_and_server() -> (TempDir, Server, String, Config) {
-        let tmp_dir = TempDir::new("test_download_file").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let server = Server::run();
         let url = server.url_str("/api/123/jobs");
         let config = Config {
@@ -298,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_archive() {
-        let tmp_dir = TempDir::new("test_extract_archive").unwrap();
+        let tmp_dir = tempdir().unwrap();
         extract_archive("test/artifact.zip", tmp_dir.path().to_str().unwrap()).unwrap();
         assert!(fs::try_exists(tmp_dir.path().join("artifact/folder1/d"))
             .await
@@ -325,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_extract_archive_invalid_zip() {
-        let tmp_dir = TempDir::new("test_extract_archive_invalid_zip").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let err = extract_archive("test/gen-test-repo.sh", tmp_dir.path().to_str().unwrap())
             .err()
             .map(|e| format!("{e:#}"))

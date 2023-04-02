@@ -2,9 +2,9 @@ use crate::artifact::extract_artifacts;
 use crate::config::Config;
 use crate::find_last_job_ok::find_last_job_ok;
 use crate::jobs::GitlabJob;
-use crate::log::{green, red, yellow};
 use crate::process::ProcessResult::{JobFound, JobNotFound, SkipCiFileExists};
 use crate::skip_ci_file::{check_skip_is_done, write_skip_done};
+use crate::skipci_log::{green, red, yellow};
 use crate::trace::{
     get_trace_url, parse_oldest_ancestor_from_job_trace, SKIP_CI_DONE_KEY,
     SKIP_CI_OLDEST_ANCESTOR_KEY,
@@ -118,7 +118,7 @@ pub mod tests {
     use std::fs::File;
     use std::path::Path;
     use std::string::String;
-    use tempdir::TempDir;
+    use tempfile::{tempdir, TempDir};
 
     pub fn create_config_ok(tmp_dir: &TempDir, url: &String) -> Config {
         Config {
@@ -161,7 +161,7 @@ pub mod tests {
     }
 
     pub fn prepare_tmp_repo() -> (TempDir, Repository) {
-        let tmp_dir = TempDir::new("test_get_tree_of_paths").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let repo_zip = Path::new("test/repo.zip");
         let zip_file = File::open(repo_zip).unwrap();
         let mut archive = zip::ZipArchive::new(zip_file).unwrap();
