@@ -2,9 +2,9 @@ use crate::artifact::extract_artifacts;
 use crate::config::Config;
 use crate::find_last_job_ok::find_last_job_ok;
 use crate::jobs::GitlabJob;
-use crate::log::{green, red, yellow};
-use crate::process::ProcessResult::{JobFound, JobNotFound, SkipCiFileExists};
+use crate::process::ProcessResult::{JobFound, JobNotFound, Skip, SkipCiFileExists};
 use crate::skip_ci_file::{check_skip_is_done, write_skip_done};
+use crate::skipci_log::{green, red, yellow};
 use crate::trace::{
     get_trace_url, parse_oldest_ancestor_from_job_trace, SKIP_CI_DONE_KEY,
     SKIP_CI_OLDEST_ANCESTOR_KEY,
@@ -17,6 +17,7 @@ pub enum ProcessResult {
     SkipCiFileExists(bool),
     JobFound(GitlabJob, String),
     JobNotFound,
+    Skip,
 }
 
 async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
@@ -25,28 +26,33 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
         // If file exists, exit
         Some(skip_ci) => SkipCiFileExists(skip_ci),
         None => {
-            // 3. Get last successful jobs of the project
-            let job_ok = find_last_job_ok(config).await?;
+            let process_result;
+            if config.skip {
+                process_result = Skip;
+            } else {
+                // 3. Get last successful jobs of the project
+                let job_ok = find_last_job_ok(config).await?;
 
-            // extract job artifact
-            let process_result = match job_ok {
-                Some(job) => {
-                    extract_artifacts(config, &job).await?;
-                    let trace_url =
-                        get_trace_url(&config.jobs_api_url, job.id, &config.api_read_token);
-                    let oldest_ancestor =
-                        match parse_oldest_ancestor_from_job_trace(&trace_url).await {
-                            Ok(Some(url)) => url,
-                            _ => job.web_url.clone(),
-                        };
+                // extract job artifact
+                process_result = match job_ok {
+                    Some(job) => {
+                        extract_artifacts(config, &job).await?;
+                        let trace_url =
+                            get_trace_url(&config.jobs_api_url, job.id, &config.api_read_token);
+                        let oldest_ancestor =
+                            match parse_oldest_ancestor_from_job_trace(&trace_url).await {
+                                Ok(Some(url)) => url,
+                                _ => job.web_url.clone(),
+                            };
 
-                    // Important to keep for the futur job that will parse this trace
-                    println!("{SKIP_CI_OLDEST_ANCESTOR_KEY}={oldest_ancestor}");
+                        // Important to keep for the futur job that will parse this trace
+                        println!("{SKIP_CI_OLDEST_ANCESTOR_KEY}={oldest_ancestor}");
 
-                    JobFound(job, oldest_ancestor)
-                }
-                None => JobNotFound,
-            };
+                        JobFound(job, oldest_ancestor)
+                    }
+                    None => JobNotFound,
+                };
+            }
 
             //     5.3. If the "git ls-tree" are equals, write true in ci-skip file and exit with code 0
             // 6. If no job found, write false in ci-skip file and exit with code > 0
@@ -54,6 +60,7 @@ async fn process(config: &Config) -> anyhow::Result<ProcessResult> {
                 JobFound(..) => write_skip_done(&config.ci_skip_path, true).await?,
                 JobNotFound => write_skip_done(&config.ci_skip_path, false).await?,
                 SkipCiFileExists(..) => {}
+                Skip => {}
             };
 
             process_result
@@ -85,6 +92,10 @@ pub async fn process_with_exit_code(config_result: anyhow::Result<Config>) -> i3
                 Err(e) => {
                     red(&format!("❌ PROCESS ERROR : \n{e:#?}"));
                     2
+                }
+                Ok(Skip) => {
+                    yellow("Skip the SkipCi process");
+                    3
                 }
             }
         }
@@ -118,7 +129,7 @@ pub mod tests {
     use std::fs::File;
     use std::path::Path;
     use std::string::String;
-    use tempdir::TempDir;
+    use tempfile::{tempdir, TempDir};
 
     pub fn create_config_ok(tmp_dir: &TempDir, url: &String) -> Config {
         Config {
@@ -134,6 +145,7 @@ pub mod tests {
             page_to_fetch_max: 2,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
+            skip: false,
         }
     }
 
@@ -151,6 +163,7 @@ pub mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 10,
             commit_to_check_same_job_max: 0,
+            skip: false,
         }
     }
 
@@ -161,7 +174,7 @@ pub mod tests {
     }
 
     pub fn prepare_tmp_repo() -> (TempDir, Repository) {
-        let tmp_dir = TempDir::new("test_get_tree_of_paths").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let repo_zip = Path::new("test/repo.zip");
         let zip_file = File::open(repo_zip).unwrap();
         let mut archive = zip::ZipArchive::new(zip_file).unwrap();
@@ -297,6 +310,7 @@ pub mod tests {
             page_to_fetch_max: 2,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
+            skip: false,
         };
         match process(&config).await.unwrap() {
             JobFound(job, oldest_ancestor) => {
@@ -353,9 +367,32 @@ pub mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 10,
             commit_to_check_same_job_max: 0,
+            skip: false,
         };
         let res = process_with_exit_code(Ok(config.clone())).await;
         assert_eq!(res, 1);
+    }
+
+    #[tokio::test]
+    async fn test_process_with_exit_code_skip() {
+        let (tmp_dir, _) = prepare_tmp_repo();
+        let config = Config {
+            api_read_token: "aaa".to_string(),
+            ci_commit_ref_name: Ok("branch1".to_string()),
+            ci_job_name: "jobA".to_string(),
+            ci_job_token: Ok("bbb".to_string()),
+            verbose: false,
+            files_to_check: "root-2 Service-A/file-A1 Service-A/file-A2".to_string(),
+            project_path: tmp_dir.path().to_str().unwrap().to_string(),
+            jobs_api_url: String::from("none"),
+            ci_skip_path: tmp_dir.path().join("skip-ci").to_str().unwrap().to_string(),
+            page_to_fetch_max: 1,
+            commit_to_check_same_ref_max: 10,
+            commit_to_check_same_job_max: 0,
+            skip: true,
+        };
+        let res = process_with_exit_code(Ok(config.clone())).await;
+        assert_eq!(res, 3);
     }
 
     #[tokio::test]
@@ -376,6 +413,7 @@ pub mod tests {
             page_to_fetch_max: 2,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
+            skip: false,
         };
         let res = process(&config).await.unwrap();
         assert!(matches!(res, JobNotFound));
@@ -399,6 +437,7 @@ pub mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 0,
             commit_to_check_same_job_max: 1,
+            skip: false,
         };
         let res = process(&config).await.unwrap();
         assert!(matches!(res, JobNotFound));
@@ -422,6 +461,7 @@ pub mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 10,
             commit_to_check_same_job_max: 0,
+            skip: false,
         };
         let res = process(&config).await.unwrap();
         assert!(matches!(res, JobNotFound));
@@ -452,6 +492,7 @@ pub mod tests {
                 page_to_fetch_max: 1,
                 commit_to_check_same_ref_max: 10,
                 commit_to_check_same_job_max: 0,
+                skip: false,
             };
             let _res = process_with_exit_code(Ok(config));
         });
@@ -482,6 +523,7 @@ pub mod tests {
             page_to_fetch_max: 0,
             commit_to_check_same_ref_max: 0,
             commit_to_check_same_job_max: 0,
+            skip: false,
         };
         let path = tmp_dir.path().join("skip-ci");
         fs::write(&path, "true").unwrap();

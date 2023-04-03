@@ -40,25 +40,25 @@ pub async fn write_skip_done(path_str: &str, result: bool) -> anyhow::Result<()>
 pub mod tests {
     use crate::skip_ci_file::{check_skip_is_done, write_skip_done};
     use std::fs;
-    use tempdir::TempDir;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_check_skip_is_done() {
-        let tmp_dir = TempDir::new("test_write_skip_done").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let path = tmp_dir.path().join("skip-ci-done-ok");
         fs::write(&path, "true").unwrap();
-        let res = check_skip_is_done(&path.to_str().unwrap()).await;
+        let res = check_skip_is_done(path.to_str().unwrap()).await;
         assert_eq!(res, Some(true));
         let path = tmp_dir.path().join("skip-ci-done-ko");
         fs::write(&path, "false").unwrap();
-        let res = check_skip_is_done(&path.to_str().unwrap()).await;
+        let res = check_skip_is_done(path.to_str().unwrap()).await;
         assert_eq!(res, Some(false));
         let path = tmp_dir.path().join("skip-ci-done");
         fs::write(&path, "").unwrap();
-        let res = check_skip_is_done(&path.to_str().unwrap()).await;
+        let res = check_skip_is_done(path.to_str().unwrap()).await;
         assert_eq!(res, Some(false));
         let path = tmp_dir.path().join("skip-ci-missing");
-        let res = check_skip_is_done(&path.to_str().unwrap()).await;
+        let res = check_skip_is_done(path.to_str().unwrap()).await;
         assert_eq!(res, None);
         let res = check_skip_is_done("test/artifact.zip").await;
         assert_eq!(res, None);
@@ -66,11 +66,9 @@ pub mod tests {
 
     #[tokio::test]
     async fn test_write_skip_done() {
-        let tmp_dir = TempDir::new("test_write_skip_done").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let path = tmp_dir.path().join("skip-ci-done-ok");
-        write_skip_done(&path.to_str().unwrap(), true)
-            .await
-            .unwrap();
+        write_skip_done(path.to_str().unwrap(), true).await.unwrap();
         assert!(path.try_exists().unwrap());
         let content = fs::read_to_string(path).unwrap();
         assert_eq!(content, "true");

@@ -91,7 +91,7 @@ mod tests {
     use std::fs;
     use std::fs::File;
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_find_last_job_ok() {
@@ -110,7 +110,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_find_last_job_ok_git_ko() {
-        let tmp_dir = TempDir::new("test_get_tree_of_paths").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let repo_zip = Path::new("test/repo.zip");
         let zip_file = File::open(repo_zip).unwrap();
         let mut archive = zip::ZipArchive::new(zip_file).unwrap();
@@ -129,6 +129,7 @@ mod tests {
             page_to_fetch_max: 2,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
+            skip: false,
         };
         let res = find_last_job_ok(&config).await;
         assert_eq!(res.err().map(|e|format!("{e:#}")).unwrap(),

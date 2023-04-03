@@ -44,10 +44,10 @@ mod tests {
     use git2::Repository;
     use std::fs::File;
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::{tempdir, TempDir};
 
     fn get_tmp_repo() -> (TempDir, Repository) {
-        let tmp_dir = TempDir::new("test_get_tree_of_paths").unwrap();
+        let tmp_dir = tempdir().unwrap();
         let repo_zip = Path::new("test/repo.zip");
         let zip_file = File::open(repo_zip).unwrap();
         let mut archive = zip::ZipArchive::new(zip_file).unwrap();

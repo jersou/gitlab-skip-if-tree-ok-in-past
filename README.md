@@ -15,7 +15,7 @@ their files.
 
 It is complementary to the Gitlab feature
 [rules:changes:compare_to](https://docs.gitlab.com/ee/ci/yaml/index.html#ruleschangescompare_to) :
-for long running branch, the files can be different from the compare_to
+for long-running branch, the files can be different from the compare_to
 reference but have been tested since the fork.
 
 Implementation summary :
@@ -70,3 +70,4 @@ The skip-if-tree-ok-in-past environment variables :
   is reached
 - `SKIP_CI_PAGE_TO_FETCH_MAX`: [default=5] max queries to the gitlabAPI /jobs
 - `SKIP_CI_VERBOSE`: [default=false] "true" to enable verbose log
+- `SKIP_SKIP_CI`: [default=false] "true" to skip the check, always exit "3"
