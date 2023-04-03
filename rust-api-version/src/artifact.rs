@@ -171,6 +171,7 @@ mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 3,
+            skip: false,
         };
         (tmp_dir, server, url, config)
     }
@@ -275,6 +276,7 @@ mod tests {
             page_to_fetch_max: 1,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 3,
+            skip: false,
         };
         let job = GitlabJob {
             id: 456,

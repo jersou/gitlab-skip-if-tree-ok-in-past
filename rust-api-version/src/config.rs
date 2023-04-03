@@ -29,6 +29,7 @@ pub struct Config {
     pub page_to_fetch_max: u32,
     pub commit_to_check_same_ref_max: u32,
     pub commit_to_check_same_job_max: u32,
+    pub skip: bool,
 }
 impl Display for Config {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -129,6 +130,9 @@ pub fn config_from_env() -> anyhow::Result<Config> {
         page_to_fetch_max,
         commit_to_check_same_ref_max,
         commit_to_check_same_job_max,
+        skip: env::var("SKIP_SKIP_CI")
+            .map(|v| v == "true")
+            .unwrap_or_default(),
     };
     verbose!("config = {config}");
     Ok(config)
@@ -429,6 +433,7 @@ mod tests {
             page_to_fetch_max: 0,
             commit_to_check_same_ref_max: 0,
             commit_to_check_same_job_max: 0,
+            skip: false,
         };
         let out = format!("{config}");
         assert_eq!(
@@ -465,6 +470,7 @@ mod tests {
             page_to_fetch_max: 0,
             commit_to_check_same_ref_max: 0,
             commit_to_check_same_job_max: 0,
+            skip: false,
         };
         let out = format!("{config}");
         assert_eq!(

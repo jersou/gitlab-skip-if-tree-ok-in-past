@@ -129,6 +129,7 @@ mod tests {
             page_to_fetch_max: 2,
             commit_to_check_same_ref_max: 2,
             commit_to_check_same_job_max: 2,
+            skip: false,
         };
         let res = find_last_job_ok(&config).await;
         assert_eq!(res.err().map(|e|format!("{e:#}")).unwrap(),

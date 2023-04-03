@@ -104,13 +104,14 @@ Usage in .gitlab-ci.yml file :
 The skip-if-tree-ok-in-past environment variables :
 - SKIP_IF_TREE_OK_IN_PAST: [required]  must contain the paths used by the job
 - API_READ_TOKEN: [required] project access tokens that have read_api scope
-- SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX: [optional default=100] stop check if
+- SKIP_CI_COMMIT_TO_CHECK_SAME_JOB_MAX: [default=100] stop check if
   this limit is reached
-- SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX: [optional default=3] stop check if this
+- SKIP_CI_COMMIT_TO_CHECK_SAME_REF_MAX: [default=3] stop check if this
   limit is reached
-- SKIP_CI_PAGE_TO_FETCH_MAX: [optional default=5] max queries to the gitlabAPI
+- SKIP_CI_PAGE_TO_FETCH_MAX: [default=5] max queries to the gitlabAPI
   /jobs
-- SKIP_CI_VERBOSE: [optional default=false] "true" to enable verbose log
+- SKIP_CI_VERBOSE: [default=false] "true" to enable verbose log
+- SKIP_SKIP_CI: [default=false] "true" to skip the check, always exit "3"
 "###;
 
 pub fn get_version_msg() -> String {
